@@ -1399,11 +1399,15 @@ public class ArrayList<E> extends AbstractList<E>
      * @throws IllegalArgumentException {@inheritDoc}
      */
     public List<E> subList(int fromIndex, int toIndex) {
+        // 本方法是通过下标范围对当前数组进行截取并返回一个新数组
+        // 先检查参数及数组范围避免后续错误
         subListRangeCheck(fromIndex, toIndex, size);
+        // 对本方法的一个封装，后续会在类SubList中有说
         return new SubList(this, 0, fromIndex, toIndex);
     }
 
     static void subListRangeCheck(int fromIndex, int toIndex, int size) {
+        // 这是具体的检查逻辑（范围内 && 方向为正），注意，当前方法是个静态方法
         if (fromIndex < 0)
             throw new IndexOutOfBoundsException("fromIndex = " + fromIndex);
         if (toIndex > size)
@@ -1413,14 +1417,16 @@ public class ArrayList<E> extends AbstractList<E>
                     ") > toIndex(" + toIndex + ")");
     }
 
+    // 数组截取类
     private class SubList extends AbstractList<E> implements RandomAccess {
         private final AbstractList<E> parent;
         private final int parentOffset;
         private final int offset;
         int size;
 
-        SubList(AbstractList<E> parent,
-                int offset, int fromIndex, int toIndex) {
+        // 返回的应该是个ArrayList，但是这里却是SubList 同 ArrayList一样，继承AbstractList并实现RandomAccess
+        SubList(AbstractList<E> parent, int offset, int fromIndex, int toIndex) {
+            // 从offset开始截取size个元素
             this.parent = parent;
             this.parentOffset = fromIndex;
             this.offset = offset + fromIndex;
@@ -1429,25 +1435,47 @@ public class ArrayList<E> extends AbstractList<E>
         }
 
         public E set(int index, E e) {
+            // 指定位置set一个元素,具体操作过程可以参照以下代码
+            /*
+                    ArrayList arr = new ArrayList();
+                    arr.add("a"); // 0
+                    arr.add("b");
+                    arr.add("c");
+                    arr.add("d"); // 3
+                    System.out.println(arr);
+                    List list = arr.subList(0, 3);
+                    // sublist的set之前绝不能增加或减少ArrayList的元素，否则抛错
+            //        arr.add("H");
+                    list.set(1,"B+");
+                    System.out.println(arr);
+                    System.out.println(list);
+             */
             rangeCheck(index);
+            // 个人觉得这个才是重点，如果ArrayList在set之前add一个元素，则这个检查是一定不通过的，这样保证版本统一
             checkForComodification();
+            // 他索引的还是ArrayList内的元素，下面的下标更新也是
             E oldValue = ArrayList.this.elementData(offset + index);
             ArrayList.this.elementData[offset + index] = e;
+            // 与ArrayList保持一致，返回该位置的老元素
             return oldValue;
         }
 
         public E get(int index) {
+            // 这个索引位置检查算是完备的 上下边界都检查 ，同时需要注意的是它检查的范围其实是SubList的（fromIndex~toIndex）这个范围
             rangeCheck(index);
             checkForComodification();
+            // 这里将index加一个offset（偏移位置)是为了保证索引的范围是SubList的（fromIndex~toIndex)这个范围
             return ArrayList.this.elementData(offset + index);
         }
 
         public int size() {
+            // SubList的"数组"大小
             checkForComodification();
             return this.size;
         }
 
         public void add(int index, E e) {
+            // 因为ArrayList、SubList维护的是同一个数组，所以在SubList内操作的时候一定要注意偏移值，一般都是要加的
             rangeCheckForAdd(index);
             checkForComodification();
             parent.add(parentOffset + index, e);
@@ -1456,6 +1484,7 @@ public class ArrayList<E> extends AbstractList<E>
         }
 
         public E remove(int index) {
+            // 同add操作一样，不再赘述~
             rangeCheck(index);
             checkForComodification();
             E result = parent.remove(parentOffset + index);
@@ -1464,19 +1493,24 @@ public class ArrayList<E> extends AbstractList<E>
             return result;
         }
 
+        // 范围删除
         protected void removeRange(int fromIndex, int toIndex) {
             checkForComodification();
             parent.removeRange(parentOffset + fromIndex,
                     parentOffset + toIndex);
             this.modCount = parent.modCount;
+            // 这里特别需要注意的是ArrayList做范围删除后SubList维护的size也要缩一些，因为这个size(fromIndex~toIndex)是ArrayList的size的子集
+            // 所以这里一般是没有抛错的可能~
             this.size -= toIndex - fromIndex;
         }
 
         public boolean addAll(Collection<? extends E> c) {
+            // 这里对SubList的addAll封装了一层，所以会在addAll(x,y)内细说~
             return addAll(this.size, c);
         }
 
         public boolean addAll(int index, Collection<? extends E> c) {
+            // 同样，这里批量添加元素也是对ArrayList的数组添加元素
             rangeCheckForAdd(index);
             int cSize = c.size();
             if (cSize==0)
@@ -1484,6 +1518,7 @@ public class ArrayList<E> extends AbstractList<E>
 
             checkForComodification();
             parent.addAll(parentOffset + index, c);
+            // 版本同步
             this.modCount = parent.modCount;
             this.size += cSize;
             return true;
@@ -1494,16 +1529,20 @@ public class ArrayList<E> extends AbstractList<E>
         }
 
         public ListIterator<E> listIterator(final int index) {
+            // 检查版本
             checkForComodification();
+            // 检查索引是否越界
             rangeCheckForAdd(index);
             final int offset = this.offset;
 
             return new ListIterator<E>() {
+                // 这个游标默认也是0
                 int cursor = index;
                 int lastRet = -1;
                 int expectedModCount = ArrayList.this.modCount;
 
                 public boolean hasNext() {
+                    // 因为当前是对SubList使用迭代器，所以游标的范围即是SubList数组索引的范围
                     return cursor != SubList.this.size;
                 }
 
@@ -1514,6 +1553,7 @@ public class ArrayList<E> extends AbstractList<E>
                     if (i >= SubList.this.size)
                         throw new NoSuchElementException();
                     Object[] elementData = ArrayList.this.elementData;
+                    // 当前方法可能需要注意的是：游标不仅要在SubList的size范围 同时 也要在ArrayList的size范围(加偏移量)
                     if (offset + i >= elementData.length)
                         throw new ConcurrentModificationException();
                     cursor = i + 1;
@@ -1526,6 +1566,7 @@ public class ArrayList<E> extends AbstractList<E>
 
                 @SuppressWarnings("unchecked")
                 public E previous() {
+                    // 当前方法与以上 next 方法类似，也不再赘述~
                     checkForComodification();
                     int i = cursor - 1;
                     if (i < 0)
@@ -1539,6 +1580,7 @@ public class ArrayList<E> extends AbstractList<E>
 
                 @SuppressWarnings("unchecked")
                 public void forEachRemaining(Consumer<? super E> consumer) {
+                    // 因为是在SubList内做函数式循环，所以它能循环的范围应该是SubList的一个字集，因为游标如果存在变动时forEachRemaining就是部分遍历
                     Objects.requireNonNull(consumer);
                     final int size = SubList.this.size;
                     int i = cursor;
@@ -1558,21 +1600,29 @@ public class ArrayList<E> extends AbstractList<E>
                 }
 
                 public int nextIndex() {
+                    // 下一个索引位置，也即游标
                     return cursor;
                 }
 
                 public int previousIndex() {
+                    // 当前（previousIndex）这个方法其实很怪异，老实说它返回的应该是while循环内的 thisIndex
+                    //  当然，这具体取决于previousIndex是在next方法之前调用还是只之后调用
+                    //  如果是next之前调用，则是真正的previousIndex，如果是next之后调用则是thisIndex
+                    //  如果外层是个while循环则是先next然后是previousIndex，这样一来当前方法应该就是thisIndex更为合理
                     return cursor - 1;
                 }
 
                 public void remove() {
+                    // lastRet在SubList内也存在（ArrayList内的）ListIterator的缺陷：必须要在next调用之后
                     if (lastRet < 0)
                         throw new IllegalStateException();
                     checkForComodification();
 
                     try {
+                        // 一层层套娃 : SubList.this.remove(lastRet) -> ArrayList.this.remove(lastRet)
                         SubList.this.remove(lastRet);
                         cursor = lastRet;
+                        // 因为每一次调用remove()后都将lastRet还原，则下一次必须是next的调用
                         lastRet = -1;
                         expectedModCount = ArrayList.this.modCount;
                     } catch (IndexOutOfBoundsException ex) {
@@ -1581,6 +1631,7 @@ public class ArrayList<E> extends AbstractList<E>
                 }
 
                 public void set(E e) {
+                    // 还是同ListIterator，只有偏移值(offset)的差异
                     if (lastRet < 0)
                         throw new IllegalStateException();
                     checkForComodification();
@@ -1597,6 +1648,7 @@ public class ArrayList<E> extends AbstractList<E>
 
                     try {
                         int i = cursor;
+                        // 这里也是一层层套娃调用
                         SubList.this.add(i, e);
                         cursor = i + 1;
                         lastRet = -1;
@@ -1607,6 +1659,7 @@ public class ArrayList<E> extends AbstractList<E>
                 }
 
                 final void checkForComodification() {
+                    // 因为维护的是同一个数组，所以极有可能存在版本的变动，要检查的
                     if (expectedModCount != ArrayList.this.modCount)
                         throw new ConcurrentModificationException();
                 }
@@ -1614,36 +1667,44 @@ public class ArrayList<E> extends AbstractList<E>
         }
 
         public List<E> subList(int fromIndex, int toIndex) {
+            // 当前方法其实也是套娃调用，sublist调用后的索引范围只是当前SubList范围的一个子集,维护的也是同一个ArrayList内的数组.
             subListRangeCheck(fromIndex, toIndex, size);
             return new SubList(this, offset, fromIndex, toIndex);
         }
 
+        // 索引范围检查
         private void rangeCheck(int index) {
             if (index < 0 || index >= this.size)
                 throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
         }
 
+        // 游标范围检查 因为subList是   fromIndex<=value<toIndex
         private void rangeCheckForAdd(int index) {
             if (index < 0 || index > this.size)
                 throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
         }
 
+        // 异常信息
         private String outOfBoundsMsg(int index) {
             return "Index: "+index+", Size: "+this.size;
         }
 
+        // 版本检查
         private void checkForComodification() {
             if (ArrayList.this.modCount != this.modCount)
                 throw new ConcurrentModificationException();
         }
 
+        // 数组列表拆分器
         public Spliterator<E> spliterator() {
             checkForComodification();
+            // TODO 这个我暂时不知道做什么用的，具体方法具体分析吧
             return new ArrayListSpliterator<E>(ArrayList.this, offset,
                     offset + this.size, this.modCount);
         }
     }
 
+    // 这是java8提供的一个函数式循环，接口继承方式是这样的：ArrayList -> AbstractList -> AbstractCollection -> Collection -> Iterable(forEach)
     @Override
     public void forEach(Consumer<? super E> action) {
         Objects.requireNonNull(action);
@@ -1651,9 +1712,12 @@ public class ArrayList<E> extends AbstractList<E>
         @SuppressWarnings("unchecked")
         final E[] elementData = (E[]) this.elementData;
         final int size = this.size;
+        // 它每一次循环都会做版本检查，这是合适的
         for (int i=0; modCount == expectedModCount && i < size; i++) {
+            // 函数式编程的一部分，具体还是使用下标式索引，浅显地觉得这样的效率真的没有普通的for循环高 TODO 具体探讨吧
             action.accept(elementData[i]);
         }
+        // 因为流式循环没法return,所以只要在循环中存在版本不一致的都会抛错
         if (modCount != expectedModCount) {
             throw new ConcurrentModificationException();
         }
@@ -1668,16 +1732,22 @@ public class ArrayList<E> extends AbstractList<E>
      * {@link Spliterator#SUBSIZED}, and {@link Spliterator#ORDERED}.
      * Overriding implementations should document the reporting of additional
      * characteristic values.
+     * 在此列表中的元素上创建一个后期绑定和快速失败的拆分器。
+     * Spliterator 报告 Spliterator.SIZED、Spliterator.SUBSIZED 和 Spliterator.ORDERED。覆盖实现应记录附加特征值的报告。
      *
      * @return a {@code Spliterator} over the elements in this list
      * @since 1.8
      */
     @Override
     public Spliterator<E> spliterator() {
+        // TODO 具体要做啥我也不知道，往后看吧
         return new ArrayListSpliterator<>(this, 0, -1, 0);
     }
 
-    /** Index-based split-by-two, lazily initialized Spliterator */
+    /**
+     * Index-based split-by-two, lazily initialized Spliterator
+     * 基于索引的二分法，延迟初始化的 Spliterat
+     * */
     static final class ArrayListSpliterator<E> implements Spliterator<E> {
 
         /*
@@ -1710,24 +1780,31 @@ public class ArrayList<E> extends AbstractList<E>
          * occur anywhere other than inside forEach itself.  The other
          * less-often-used methods cannot take advantage of most of
          * these streamlinings.
+         *  如果 ArrayLists 是不可变的，或者结构上不可变的（没有添加、删除等），我们可以使用 Arrays.spliterator 实现它们的拆分器。
+         * 相反，我们在不牺牲太多性能的情况下，在遍历过程中检测到尽可能多的干扰。我们主要依靠 modCounts。这些不能保证检测并发冲突，有时对线程内干扰过于保守，
+         * 但检测到足够多的问题在实践中是值得的。为此，我们 (1) 懒惰地初始化 fence 和 expectedModCount 直到我们需要提交到我们正在检查的状态的最新点；从而提高精度。
+         * （这不适用于创建具有当前非惰性值的拆分器的子列表）。 (2) 我们在 forEach （对性能最敏感的方法）结束时只执行一次 ConcurrentModificationException 检查。
+         * 当使用 forEach（相对于迭代器）时，我们通常只能在动作之后检测干扰，而不是之前。进一步的 CME 触发检查适用于所有其他可能违反假设的情况，
+         * 例如给定其 size() 的 null 或太小的 elementData 数组，这可能只是由于干扰而发生。这允许 forEach 的内部循环在没有任何进一步检查的情况下运行，
+         * 并简化了 lambda 解析。虽然这确实需要一些检查，但请注意，在 list.stream().forEach(a) 的常见情况下，除了 forEach 本身之外，不会发生任何检查或其他计算。
+         * 其他不太常用的方法不能利用这些流线化的大部分。
          */
 
         private final ArrayList<E> list;
-        private int index; // current index, modified on advance/split
-        private int fence; // -1 until used; then one past last index
-        private int expectedModCount; // initialized when fence set
+        private int index; // current index, modified on advance/split :当前索引，在Advance/split上修改
+        private int fence; // -1 until used; then one past last index :-1 直到使用；然后是最后一个索引
+        private int expectedModCount; // initialized when fence set :设置围栏时初始化
 
-        /** Create new spliterator covering the given  range */
-        ArrayListSpliterator(ArrayList<E> list, int origin, int fence,
-                             int expectedModCount) {
-            this.list = list; // OK if null unless traversed
+        /** Create new spliterator covering the given  range :创建覆盖给定范围的新拆分器 (0,-1,0) */
+        ArrayListSpliterator(ArrayList<E> list, int origin, int fence, int expectedModCount) {
+            this.list = list; // OK if null unless traversed OK if null 除非被遍历
             this.index = origin;
-            this.fence = fence;
+            this.fence = fence; // 栅栏
             this.expectedModCount = expectedModCount;
         }
 
-        private int getFence() { // initialize fence to size on first use
-            int hi; // (a specialized variant appears in method forEach)
+        private int getFence() { // initialize fence to size on first use  :首次使用时将栅栏初始化为大小
+            int hi; // (a specialized variant appears in method forEach) :一个专门的变体出现在 forEach 方法中
             ArrayList<E> lst;
             if ((hi = fence) < 0) {
                 if ((lst = list) == null)
@@ -1742,7 +1819,7 @@ public class ArrayList<E> extends AbstractList<E>
 
         public ArrayListSpliterator<E> trySplit() {
             int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
-            return (lo >= mid) ? null : // divide range in half unless too small
+            return (lo >= mid) ? null : // divide range in half unless too small 将范围分成两半，除非太小
                     new ArrayListSpliterator<E>(list, lo, index = mid,
                             expectedModCount);
         }
