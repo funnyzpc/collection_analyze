@@ -23,13 +23,14 @@
  *
  */
 
-package com.mee.source;
+package com.mee.source.c2;
 
+
+import java.io.IOException;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.io.IOException;
+import java.util.function.Consumer;
 
 /**
  * <p>Hash table and linked list implementation of the <tt>Map</tt> interface,
@@ -44,7 +45,7 @@ import java.io.IOException;
  * the invocation.)
  *
  * <p>This implementation spares its clients from the unspecified, generally
- * chaotic ordering provided by {@link HashMap} (and {@link Hashtable}),
+ * chaotic ordering provided by {@link com.mee.source.c2.HashMap} (and {@link Hashtable}),
  * without incurring the increased cost associated with {@link TreeMap}.  It
  * can be used to produce a copy of a map that has the same order as the
  * original, regardless of the original map's implementation:
@@ -156,7 +157,7 @@ import java.io.IOException;
  * @see     Object#hashCode()
  * @see     Collection
  * @see     Map
- * @see     HashMap
+ * @see     com.mee.source.c2.HashMap
  * @see     TreeMap
  * @see     Hashtable
  * @since   1.4
@@ -190,7 +191,7 @@ public class LinkedHashMap<K,V>
     /**
      * HashMap.Node subclass for normal LinkedHashMap entries.
      */
-    static class Entry<K,V> extends HashMap.Node<K,V> {
+    static class Entry<K,V> extends Node<K,V> {
         Entry<K,V> before, after;
         Entry(int hash, K key, V value, Node<K,V> next) {
             super(hash, key, value, next);
@@ -202,12 +203,12 @@ public class LinkedHashMap<K,V>
     /**
      * The head (eldest) of the doubly linked list.
      */
-    transient LinkedHashMap.Entry<K,V> head;
+    transient Entry<K,V> head;
 
     /**
      * The tail (youngest) of the doubly linked list.
      */
-    transient LinkedHashMap.Entry<K,V> tail;
+    transient Entry<K,V> tail;
 
     /**
      * The iteration ordering method for this linked hash map: <tt>true</tt>
@@ -220,8 +221,8 @@ public class LinkedHashMap<K,V>
     // internal utilities
 
     // link at the end of list
-    private void linkNodeLast(LinkedHashMap.Entry<K,V> p) {
-        LinkedHashMap.Entry<K,V> last = tail;
+    private void linkNodeLast(Entry<K,V> p) {
+        Entry<K,V> last = tail;
         tail = p;
         if (last == null)
             head = p;
@@ -232,10 +233,10 @@ public class LinkedHashMap<K,V>
     }
 
     // apply src's links to dst
-    private void transferLinks(LinkedHashMap.Entry<K,V> src,
-                               LinkedHashMap.Entry<K,V> dst) {
-        LinkedHashMap.Entry<K,V> b = dst.before = src.before;
-        LinkedHashMap.Entry<K,V> a = dst.after = src.after;
+    private void transferLinks(Entry<K,V> src,
+                               Entry<K,V> dst) {
+        Entry<K,V> b = dst.before = src.before;
+        Entry<K,V> a = dst.after = src.after;
         if (b == null)
             head = dst;
         else
@@ -254,16 +255,16 @@ public class LinkedHashMap<K,V>
     }
 
     Node<K,V> newNode(int hash, K key, V value, Node<K,V> e) {
-        LinkedHashMap.Entry<K,V> p =
-                new LinkedHashMap.Entry<K,V>(hash, key, value, e);
+        Entry<K,V> p =
+                new Entry<K,V>(hash, key, value, e);
         linkNodeLast(p);
         return p;
     }
 
     Node<K,V> replacementNode(Node<K,V> p, Node<K,V> next) {
-        LinkedHashMap.Entry<K,V> q = (LinkedHashMap.Entry<K,V>)p;
-        LinkedHashMap.Entry<K,V> t =
-                new LinkedHashMap.Entry<K,V>(q.hash, q.key, q.value, next);
+        Entry<K,V> q = (Entry<K,V>)p;
+        Entry<K,V> t =
+                new Entry<K,V>(q.hash, q.key, q.value, next);
         transferLinks(q, t);
         return t;
     }
@@ -275,15 +276,15 @@ public class LinkedHashMap<K,V>
     }
 
     TreeNode<K,V> replacementTreeNode(Node<K,V> p, Node<K,V> next) {
-        LinkedHashMap.Entry<K,V> q = (LinkedHashMap.Entry<K,V>)p;
+        Entry<K,V> q = (Entry<K,V>)p;
         TreeNode<K,V> t = new TreeNode<K,V>(q.hash, q.key, q.value, next);
         transferLinks(q, t);
         return t;
     }
 
     void afterNodeRemoval(Node<K,V> e) { // unlink
-        LinkedHashMap.Entry<K,V> p =
-                (LinkedHashMap.Entry<K,V>)e, b = p.before, a = p.after;
+        Entry<K,V> p =
+                (Entry<K,V>)e, b = p.before, a = p.after;
         p.before = p.after = null;
         if (b == null)
             head = a;
@@ -296,7 +297,7 @@ public class LinkedHashMap<K,V>
     }
 
     void afterNodeInsertion(boolean evict) { // possibly remove eldest
-        LinkedHashMap.Entry<K,V> first;
+        Entry<K,V> first;
         if (evict && (first = head) != null && removeEldestEntry(first)) {
             K key = first.key;
             removeNode(hash(key), key, null, false, true);
@@ -304,10 +305,10 @@ public class LinkedHashMap<K,V>
     }
 
     void afterNodeAccess(Node<K,V> e) { // move node to last
-        LinkedHashMap.Entry<K,V> last;
+        Entry<K,V> last;
         if (accessOrder && (last = tail) != e) {
-            LinkedHashMap.Entry<K,V> p =
-                    (LinkedHashMap.Entry<K,V>)e, b = p.before, a = p.after;
+            Entry<K,V> p =
+                    (Entry<K,V>)e, b = p.before, a = p.after;
             p.after = null;
             if (b == null)
                 head = a;
@@ -329,7 +330,7 @@ public class LinkedHashMap<K,V>
     }
 
     void internalWriteEntries(java.io.ObjectOutputStream s) throws IOException {
-        for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after) {
+        for (Entry<K,V> e = head; e != null; e = e.after) {
             s.writeObject(e.key);
             s.writeObject(e.value);
         }
@@ -413,7 +414,7 @@ public class LinkedHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
-        for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after) {
+        for (Entry<K,V> e = head; e != null; e = e.after) {
             V v = e.value;
             if (v == value || (value != null && value.equals(v)))
                 return true;
@@ -556,7 +557,7 @@ public class LinkedHashMap<K,V>
             if (action == null)
                 throw new NullPointerException();
             int mc = modCount;
-            for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after)
+            for (Entry<K,V> e = head; e != null; e = e.after)
                 action.accept(e.key);
             if (modCount != mc)
                 throw new ConcurrentModificationException();
@@ -605,7 +606,7 @@ public class LinkedHashMap<K,V>
             if (action == null)
                 throw new NullPointerException();
             int mc = modCount;
-            for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after)
+            for (Entry<K,V> e = head; e != null; e = e.after)
                 action.accept(e.value);
             if (modCount != mc)
                 throw new ConcurrentModificationException();
@@ -668,7 +669,7 @@ public class LinkedHashMap<K,V>
             if (action == null)
                 throw new NullPointerException();
             int mc = modCount;
-            for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after)
+            for (Entry<K,V> e = head; e != null; e = e.after)
                 action.accept(e);
             if (modCount != mc)
                 throw new ConcurrentModificationException();
@@ -681,7 +682,7 @@ public class LinkedHashMap<K,V>
         if (action == null)
             throw new NullPointerException();
         int mc = modCount;
-        for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after)
+        for (Entry<K,V> e = head; e != null; e = e.after)
             action.accept(e.key, e.value);
         if (modCount != mc)
             throw new ConcurrentModificationException();
@@ -691,7 +692,7 @@ public class LinkedHashMap<K,V>
         if (function == null)
             throw new NullPointerException();
         int mc = modCount;
-        for (LinkedHashMap.Entry<K,V> e = head; e != null; e = e.after)
+        for (Entry<K,V> e = head; e != null; e = e.after)
             e.value = function.apply(e.key, e.value);
         if (modCount != mc)
             throw new ConcurrentModificationException();
@@ -700,8 +701,8 @@ public class LinkedHashMap<K,V>
     // Iterators
 
     abstract class LinkedHashIterator {
-        LinkedHashMap.Entry<K,V> next;
-        LinkedHashMap.Entry<K,V> current;
+        Entry<K,V> next;
+        Entry<K,V> current;
         int expectedModCount;
 
         LinkedHashIterator() {
@@ -714,8 +715,8 @@ public class LinkedHashMap<K,V>
             return next != null;
         }
 
-        final LinkedHashMap.Entry<K,V> nextNode() {
-            LinkedHashMap.Entry<K,V> e = next;
+        final Entry<K,V> nextNode() {
+            Entry<K,V> e = next;
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
             if (e == null)
