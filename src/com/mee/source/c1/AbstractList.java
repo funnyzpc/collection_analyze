@@ -23,7 +23,7 @@
  *
  */
 
-package com.mee.source.arr;
+package com.mee.source.c1;
 
 import java.util.*;
 
@@ -589,6 +589,9 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * {@code set} or {@code add} operations.  This provides
      * <i>fail-fast</i> behavior, rather than non-deterministic behavior in
      * the face of concurrent modification during iteration.
+     * 该字段由 iterator 和 listIterator 方法返回的迭代器和列表迭代器实现使用。
+     * 如果此字段的值意外更改，迭代器（或列表迭代器）将抛出 ConcurrentModificationException 以响应下一个、删除、上一个、设置或添加操作。
+     * 这提供了快速失败的行为，而不是面对迭代期间的并发修改时的不确定行为。
      *
      * <p><b>Use of this field by subclasses is optional.</b> If a subclass
      * wishes to provide fail-fast iterators (and list iterators), then it
@@ -600,6 +603,9 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * bogus {@code ConcurrentModificationExceptions}.  If an implementation
      * does not wish to provide fail-fast iterators, this field may be
      * ignored.
+     *  子类对该字段的使用是可选的。如果一个子类希望提供快速失败的迭代器（和列表迭代器），那么它只需要在其 add(int, E) 和 remove(int) 方法（以及它覆盖的任何其他导致结构列表的修改）。
+     *  对 add(int, E) 或 remove(int) 的单个调用必须向该字段添加不超过一个，否则迭代器（和列表迭代器）将抛出虚假的 ConcurrentModificationExceptions。
+     *  如果实现不希望提供快速失败的迭代器，则可以忽略此字段。
      */
     protected transient int modCount = 0;
 

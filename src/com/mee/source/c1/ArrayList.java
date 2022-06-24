@@ -23,7 +23,7 @@
  *
  */
 
-package com.mee.source.arr;
+package com.mee.source.c1;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -1206,38 +1206,66 @@ public class ArrayList<E> extends AbstractList<E>
             checkForComodification();
 
             try {
+                // 迭代器内的删除其实调用的是ArrayList的删除方法,当然只删除元素是不够了，因为当前是在迭代器内所以还有其它变动~
                 ArrayList.this.remove(lastRet);
+                // 本来游标(cursor)是指向下一个索引的位置的，这里需要缩一个，以保证下一次 hasNext
                 cursor = lastRet;
+                // 老实说这个指向当前元素位置的索引 是可以不用重写赋值的，因为 lastRet 会在每次next后被重置为cursor
                 lastRet = -1;
+                // TODO 这句其实很奇怪的，如果按照官方注释所说的，这个是记录修改的次数的话 其实应该将 modCount+1的
+                // 而这里直接将其扔给了迭代器的成员变量 expectedModCount
                 expectedModCount = modCount;
             } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
             }
         }
 
+        // 循环每个剩余操作
+        // 这是java8提供给iterator的函数式循环接口，其使用方式如下
+        //        ArrayList arr = new ArrayList();
+        //        arr.add("a");
+        //        arr.add("b");
+        //        arr.add("c");
+        //        System.out.println(arr);
+        //        Iterator iterator = arr.iterator();
+        //        iterator.next(); // a
+        //        iterator.forEachRemaining(item-> System.out.println(item)); // b c
         @Override
         @SuppressWarnings("unchecked")
         public void forEachRemaining(Consumer<? super E> consumer) {
+            // 检查是否为null，否则抛出错误
             Objects.requireNonNull(consumer);
+            // 获取当前数组大小并检查迭代器的游标位置是否大于数组大小
             final int size = ArrayList.this.size;
             int i = cursor;
             if (i >= size) {
                 return;
             }
+            // 老实说 elementData.length 与 ArrayList.this.size 是一对一关联的，这里这样做似乎多余
             final Object[] elementData = ArrayList.this.elementData;
             if (i >= elementData.length) {
                 throw new ConcurrentModificationException();
             }
             while (i != size && modCount == expectedModCount) {
+                // 消费这个元素，同时将游标位置+1
                 consumer.accept((E) elementData[i++]);
             }
-            // update once at end of iteration to reduce heap write traffic
+            // update once at end of iteration to reduce heap write traffic 在迭代结束时更新一次以减少堆写入流量
+            // 因为i在以上已经+1了，所以这里直接赋值以及重置当前迭代的索引位置（lastRet）
             cursor = i;
             lastRet = i - 1;
             checkForComodification();
         }
 
-        // 这个个人理解，应该是防止多线程并发而做的一个安全措施
+        // 这个个人理解，应该是防止多线程并发而做的一个安全措施..（其实这不对）
+        //  因为ArrayList与迭代器Iterator共享的是同一个数组对象，所以在构建迭代器及迭代器使用完成之前都不可使用ArrayList的增删改查，否则信息不同步会造成迭代器错误，用下面代码即可验证问题本身
+        //  ArrayList arr = new ArrayList();
+        //  arr.add("a");
+        //  arr.add("b");
+        //  arr.add("c");
+        //  ListIterator listIterator = arr.listIterator();
+        //  arr.remove("a");
+        //  Object previous = listIterator.previous();
         final void checkForComodification() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
@@ -1246,21 +1274,28 @@ public class ArrayList<E> extends AbstractList<E>
 
     /**
      * An optimized version of AbstractList.ListItr
+     *  AbstractList.ListItr 的优化版本
+     *  其实也就是 Iterator 的强化版本 ，相比Iterator，ListIterator提供了迭代器的增删改查，同时也可双向循环，也可返回当前循环索引
      */
     private class ListItr extends Itr implements ListIterator<E> {
+        // 默认构造方法的循环索引其实是从0开始的，顺带说明下这个带参的构造方法内的cursor其实是Itr的
+        // 对于带参的构造方法的唯一缺点是：它并没有对index做检查 ，直到每次调用时会检查抛出错误 (此处说明有误，详见 listIterator(...) )
         ListItr(int index) {
             super();
             cursor = index;
         }
 
+        // 是否存在上一个元素,好简单：直接判断游标位
         public boolean hasPrevious() {
             return cursor != 0;
         }
 
+        // 下一个循环位，好简单: 直接返回游标位
         public int nextIndex() {
             return cursor;
         }
 
+        // 上一个循环位,也很简单，其实也就是游标-1，这里使用一定要在next()调用之前，否则它返回的是当前迭代器索引位置
         public int previousIndex() {
             return cursor - 1;
         }
@@ -1268,22 +1303,41 @@ public class ArrayList<E> extends AbstractList<E>
         @SuppressWarnings("unchecked")
         public E previous() {
             checkForComodification();
+            // 因为ListIterator的api调用是有顺序的，当前方法调用的一个必要条件是当前迭代的位置不能为 0 ！，这很重要
             int i = cursor - 1;
             if (i < 0)
                 throw new NoSuchElementException();
             Object[] elementData = ArrayList.this.elementData;
             if (i >= elementData.length)
                 throw new ConcurrentModificationException();
+            // 这里的游标 cursor也就是 cursor - 1
             cursor = i;
             return (E) elementData[lastRet = i];
         }
 
         public void set(E e) {
+            // 这里也是一样，一定要调用next()才能生效,否则会抛错
             if (lastRet < 0)
                 throw new IllegalStateException();
             checkForComodification();
-
             try {
+                // set其实也就是replace,只能在当前size内改写元素，具体可见
+                /*
+                    ArrayList arr = new ArrayList();
+                    arr.add("a");
+                    arr.add("b");
+                    arr.add("c");
+                    System.out.println("before:"+arr); // before:[a, b, c]
+                    ListIterator listIterator = arr.listIterator();
+                    while(listIterator.hasNext()){
+                        Object item = listIterator.next();
+                        System.out.println(item);
+                        if("b".equals(item)){
+                            listIterator.set("B");
+                        }
+                    }
+                    System.out.println("after:"+arr); // after:[a, B, c]
+                 */
                 ArrayList.this.set(lastRet, e);
             } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
@@ -1292,12 +1346,15 @@ public class ArrayList<E> extends AbstractList<E>
 
         public void add(E e) {
             checkForComodification();
-
             try {
+                // ArrayList的添加方法，在游标位置添加元素，游标及之后的元素往后移动，
                 int i = cursor;
+                // 这里还需要注意的是这个插入是在当前元素之后插入元素，ArrayList则是在元素之前，这主要是游标是当前位置+1
                 ArrayList.this.add(i, e);
+                // 因为增加了个元素，所以游标的位置要+1，当前位置lastRet会在下一次调用next或previous时会被重置
                 cursor = i + 1;
                 lastRet = -1;
+                // 这个其实类似于版本的概念，主要由于ArrayList与Iterator修改不同步，expectedModCount，这个会在 checkForComodification() 中进行校验
                 expectedModCount = modCount;
             } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
@@ -1312,24 +1369,31 @@ public class ArrayList<E> extends AbstractList<E>
      * empty.)  The returned list is backed by this list, so non-structural
      * changes in the returned list are reflected in this list, and vice-versa.
      * The returned list supports all of the optional list operations.
+     * 返回此列表在指定的 fromIndex（包括）和 toIndex（不包括）之间的部分的视图。
+     * （如果 fromIndex 和 toIndex 相等，则返回列表为空。）返回列表由此列表支持，因此返回列表中的非结构性更改会反映在此列表中，反之亦然。返回的列表支持所有可选的列表操作。
      *
      * <p>This method eliminates the need for explicit range operations (of
      * the sort that commonly exist for arrays).  Any operation that expects
      * a list can be used as a range operation by passing a subList view
      * instead of a whole list.  For example, the following idiom
      * removes a range of elements from a list:
+     *  这种方法消除了显式范围操作的需要（通常存在于数组中的那种）。
+     *  通过传递 subList 视图而不是整个列表，任何需要列表的操作都可以用作范围操作。例如，以下习惯用法从列表中删除一系列元素：
      * <pre>
      *      list.subList(from, to).clear();
      * </pre>
      * Similar idioms may be constructed for {@link #indexOf(Object)} and
      * {@link #lastIndexOf(Object)}, and all of the algorithms in the
      * {@link Collections} class can be applied to a subList.
+     * 可以为 indexOf(Object) 和 lastIndexOf(Object) 构造类似的习语，并且 Collections 类中的所有算法都可以应用于子列表。
      *
      * <p>The semantics of the list returned by this method become undefined if
      * the backing list (i.e., this list) is <i>structurally modified</i> in
      * any way other than via the returned list.  (Structural modifications are
      * those that change the size of this list, or otherwise perturb it in such
      * a fashion that iterations in progress may yield incorrect results.)
+     * 如果后备列表（即此列表）以除通过返回列表之外的任何方式进行结构修改，则此方法返回的列表的语义将变为未定义。
+     * （结构修改是改变这个列表的大小，或者以其他方式扰乱它，使得正在进行的迭代可能会产生不正确的结果。）
      *
      * @throws IndexOutOfBoundsException {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
