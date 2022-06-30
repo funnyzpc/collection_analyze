@@ -178,7 +178,7 @@ public class ArrayList<E> extends AbstractList<E>
      * 构造一个给定初始容量的空数组(列表)
      *
      * @param  initialCapacity  the initial capacity of the list
-     *                          初始化容量的列表
+     *                          初始化容量的列表（也就是初始化容量大小)
      * @throws IllegalArgumentException if the specified initial capacity is negative
      *                      如果初始容量是负数（则抛错）
      */
