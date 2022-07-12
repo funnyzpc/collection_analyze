@@ -46,6 +46,9 @@ import java.util.function.Function;
  * unsynchronized and permits nulls.)  This class makes no guarantees as to
  * the order of the map; in particular, it does not guarantee that the order
  * will remain constant over time.
+ * Map 接口的基于哈希表的实现。此实现提供所有可选的映射操作，并允许空值和空键。
+ * （HashMap 类大致相当于 Hashtable，除了它是不同步的并且允许空值。）
+ * 这个类不保证映射的顺序；特别是，它不保证订单会随着时间的推移保持不变。
  *
  * <p>This implementation provides constant-time performance for the basic
  * operations (<tt>get</tt> and <tt>put</tt>), assuming the hash function
@@ -55,6 +58,9 @@ import java.util.function.Function;
  * of key-value mappings).  Thus, it's very important not to set the initial
  * capacity too high (or the load factor too low) if iteration performance is
  * important.
+ * 此实现为基本操作（get 和 put）提供恒定时间性能，假设哈希函数将元素正确地分散在桶中。
+ * 对集合视图的迭代需要的时间与 HashMap 实例的“容量”（桶的数量）加上它的大小（键值映射的数量）成正比。
+ * 因此，如果迭代性能很重要，则不要将初始容量设置得太高（或负载因子太低），这一点非常重要。
  *
  * <p>An instance of <tt>HashMap</tt> has two parameters that affect its
  * performance: <i>initial capacity</i> and <i>load factor</i>.  The
@@ -66,6 +72,10 @@ import java.util.function.Function;
  * current capacity, the hash table is <i>rehashed</i> (that is, internal data
  * structures are rebuilt) so that the hash table has approximately twice the
  * number of buckets.
+ * HashMap 的实例有两个影响其性能的参数：初始容量和负载因子。
+ * 容量是哈希表中的桶数，初始容量只是哈希表创建时的容量。
+ * 负载因子是哈希表在其容量自动增加之前允许达到的程度的度量。
+ * 当哈希表中的条目数超过负载因子和当前容量的乘积时，对哈希表进行重新哈希（即重建内部数据结构），使哈希表的桶数大约增加一倍。
  *
  * <p>As a general rule, the default load factor (.75) offers a good
  * tradeoff between time and space costs.  Higher values decrease the
@@ -77,6 +87,10 @@ import java.util.function.Function;
  * rehash operations.  If the initial capacity is greater than the
  * maximum number of entries divided by the load factor, no rehash
  * operations will ever occur.
+ * 作为一般规则，默认负载因子 (.75) 在时间和空间成本之间提供了良好的折衷。
+ * 较高的值会减少空间开销，但会增加查找成本（反映在 HashMap 类的大多数操作中，包括 get 和 put）。
+ * 在设置其初始容量时，应考虑映射中的预期条目数及其负载因子，以尽量减少重新哈希操作的次数。
+ * 如果初始容量大于最大条目数除以负载因子，则不会发生重新哈希操作。
  *
  * <p>If many mappings are to be stored in a <tt>HashMap</tt>
  * instance, creating it with a sufficiently large capacity will allow
@@ -86,6 +100,9 @@ import java.util.function.Function;
  * down performance of any hash table. To ameliorate impact, when keys
  * are {@link Comparable}, this class may use comparison order among
  * keys to help break ties.
+ * 如果要在一个 HashMap 实例中存储许多映射，则创建具有足够大容量的映射将比让它根据需要执行自动重新散列以增加表来更有效地存储映射。
+ * 请注意，使用具有相同 hashCode() 的多个键是降低任何哈希表性能的可靠方法。
+ * 为了改善影响，当键是 Comparable 时，此类可以使用键之间的比较顺序来帮助打破平局。
  *
  * <p><strong>Note that this implementation is not synchronized.</strong>
  * If multiple threads access a hash map concurrently, and at least one of
@@ -100,6 +117,10 @@ import java.util.function.Function;
  * {@link Collections#synchronizedMap Collections.synchronizedMap}
  * method.  This is best done at creation time, to prevent accidental
  * unsynchronized access to the map:<pre>
+ *     请注意，此实现不同步。如果多个线程同时访问一个哈希映射，并且至少有一个线程在结构上修改了映射，则必须在外部进行同步。
+ *     （结构修改是添加或删除一个或多个映射的任何操作；仅更改与实例已包含的键关联的值不是结构修改。）
+ *     这通常通过在自然封装映射的某个对象上同步来完成.如果不存在这样的对象，
+ *     则应使用 Collections.synchronizedMap 方法“包装”地图。这最好在创建时完成，以防止对地图的意外不同步访问：
  *   Map m = Collections.synchronizedMap(new HashMap(...));</pre>
  *
  * <p>The iterators returned by all of this class's "collection view methods"
@@ -110,6 +131,10 @@ import java.util.function.Function;
  * modification, the iterator fails quickly and cleanly, rather than risking
  * arbitrary, non-deterministic behavior at an undetermined time in the
  * future.
+ * 所有此类的“集合视图方法”返回的迭代器都是快速失败的：如果在创建迭代器后的任何时间对映射进行结构修改，
+ * 除了通过迭代器自己的 remove 方法之外，迭代器将抛出 ConcurrentModificationException .
+ * 因此，面对并发修改，迭代器快速而干净地失败，而不是在未来不确定的时间冒任意的、非确定性的行为。
+ * 也就是除了使用迭代器删除外，其他删除方式是一定会抛错
  *
  * <p>Note that the fail-fast behavior of an iterator cannot be guaranteed
  * as it is, generally speaking, impossible to make any hard guarantees in the
@@ -118,18 +143,34 @@ import java.util.function.Function;
  * Therefore, it would be wrong to write a program that depended on this
  * exception for its correctness: <i>the fail-fast behavior of iterators
  * should be used only to detect bugs.</i>
+ * 请注意，不能保证迭代器的快速失败行为，因为一般来说，在存在不同步的并发修改的情况下，
+ * 不可能做出任何硬保证。快速失败的迭代器会尽最大努力抛出 ConcurrentModificationException。
+ * 因此，编写一个依赖于这个异常的正确性的程序是错误的：迭代器的快速失败行为应该只用于检测错误。
+ * => 就是并发错误并不能依此作为程序正确错误的判断。
  *
  * <p>This class is a member of the
  * <a href="{@docRoot}/../technotes/guides/collections/index.html">
  * Java Collections Framework</a>.
+ * 此类是 Java 集合框架的成员。
  *
- * @param <K> the type of keys maintained by this map
- * @param <V> the type of mapped values
+ * @param <K> the type of keys maintained by this map 此映射维护的键的类型
+ * @param <V> the type of mapped values 映射值的类型
  *
  * @author  Doug Lea
+ *  Douglas S. Lea是纽约州立大学奥斯威戈分校的计算机科学教授，现任计算机科学系主任，他专门研究并发编程和并发数据结构的设计。
+ *  他是Java Community Process执行委员会的成员，并担任JSR 166的主席，该程序为Java编程语言添加了并发实用程序。
+ *
  * @author  Josh Bloch
+ *  约书亚·布洛克，美国著名程序员。他为Java平台设计并实作了许多的功能，曾担任Google的首席Java架构师。
+ *
  * @author  Arthur van Hoff
+ *  Java编程语言的早期贡献者，在斯特拉斯克莱德大学和Hogere Informatica Opleiding学习计算机科学后，Van Hoff加入了Sun Microsystems，
+ *  担任分布式对象无处不在团队的工程师。1993年，他加入了Java开发团队，编写该语言的编译器，并负责1995年8月首次向Netscape发布该语言。
+ *
  * @author  Neal Gafter
+ *  约书亚·布洛克（英语：Joshua J. Bloch，1961年8月28日－），美国著名程序员。
+ *  他为Java平台设计并实作了许多的功能，曾担任Google的首席Java架构师（Chief Java Architect）。
+ *
  * @see     Object#hashCode()
  * @see     Collection
  * @see     Map
@@ -143,7 +184,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     private static final long serialVersionUID = 362498820763181265L;
 
     /*
-     * Implementation notes.
+     * Implementation notes. 实现说明。
      *
      * This map usually acts as a binned (bucketed) hash table, but
      * when bins get too large, they are transformed into bins of
@@ -155,6 +196,10 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * when overpopulated. However, since the vast majority of bins in
      * normal use are not overpopulated, checking for existence of
      * tree bins may be delayed in the course of table methods.
+     * 此映射通常充当分箱（分桶）哈希表，但当箱变得太大时，它们会转换为 TreeNode 的箱，每个结构类似于 java.util.TreeMap 中的结构。
+     * 大多数方法尝试使用正常的 bin，但在适用时中继到 TreeNode 方法（只需检查节点的实例）。
+     * TreeNode 的 bin 可以像任何其他 bin 一样被遍历和使用，但在填充过多时还支持更快的查找。
+     * 然而，由于绝大多数正常使用的 bin 并没有被过度填充，因此在 table 方法的过程中检查树 bin 的存在可能会被延迟。
      *
      * Tree bins (i.e., bins whose elements are all TreeNodes) are
      * ordered primarily by hashCode, but in the case of ties, if two
@@ -173,6 +218,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * precautions. But the only known cases stem from poor user
      * programming practices that are already so slow that this makes
      * little difference.)
+     * 树箱（即元素都是 TreeNodes 的箱）主要按 hashCode 排序，但在平局的情况下，如果两个元素属于相同的“C 类实现 Comparable<C>”，
+     * 则使用它们的 compareTo 方法订购。 （我们保守地通过反射检查泛型类型来验证这一点——参见方法 compatibleClassFor）。
+     * 当键具有不同的哈希值或可排序时，树箱增加的复杂性在提供最坏情况 O(log n) 操作时是值得的，
+     * 因此，在 hashCode() 方法返回的值很差的意外或恶意使用下，性能会优雅地下降分布式的，以及许多键共享一个 hashCode 的，
+     * 只要它们也是 Comparable 的。 （如果这些都不适用，与不采取预防措施相比，我们可能会浪费大约两倍的时间和空间
+     * 。但唯一已知的案例源于糟糕的用户编程实践，这些实践已经很慢，几乎没有什么区别。）
      *
      * Because TreeNodes are about twice the size of regular nodes, we
      * use them only when bins contain enough nodes to warrant use
@@ -187,6 +238,11 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * resizing granularity. Ignoring variance, the expected
      * occurrences of list size k are (exp(-0.5) * pow(0.5, k) /
      * factorial(k)). The first values are:
+     * 因为 TreeNode 的大小大约是常规节点的两倍，所以我们仅在 bin 包含足够的节点以保证使用时才使用它们（请参阅 TREEIFY_THRESHOLD）。
+     * 当它们变得太小（由于移除或调整大小）时，它们会被转换回普通垃圾箱。在具有良好分布的用户哈希码的使用中，很少使用树箱。
+     * 理想情况下，在随机 hashCodes 下，bin 中节点的频率遵循泊松分布 (http:en.wikipedia.orgwikiPoisson_distribution)，
+     * 默认调整大小阈值为 0.75，平均参数约为 0.5，尽管由于调整大小粒度而存在很大差异.忽略方差，
+     * 列表大小 k 的预期出现是 (exp(-0.5) pow(0.5, k) factorial(k))。第一个值是：
      *
      * 0:    0.60653066
      * 1:    0.30326533
@@ -198,11 +254,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * 7:    0.00000094
      * 8:    0.00000006
      * more: less than 1 in ten million
+     * 更多：不到千万分之一
      *
      * The root of a tree bin is normally its first node.  However,
      * sometimes (currently only upon Iterator.remove), the root might
      * be elsewhere, but can be recovered following parent links
      * (method TreeNode.root()).
+     * 树箱的根通常是它的第一个节点。但是，有时（目前仅在 Iterator.remove 上），根可能在其他地方，
+     * 但可以在父链接之后恢复（方法 TreeNode.root()）。
      *
      * All applicable internal methods accept a hash code as an
      * argument (as normally supplied from a public method), allowing
