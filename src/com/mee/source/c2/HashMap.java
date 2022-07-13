@@ -269,6 +269,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Most internal methods also accept a "tab" argument, that is
      * normally the current table, but may be a new or old one when
      * resizing or converting.
+     * 所有适用的内部方法都接受哈希码作为参数（通常由公共方法提供），允许它们相互调用而无需重新计算用户哈希码。
+     * 大多数内部方法还接受“tab”参数，通常是当前表，但在调整大小或转换时可能是新表或旧表。
      *
      * When bin lists are treeified, split, or untreeified, we keep
      * them in the same relative access/traversal order (i.e., field
@@ -278,6 +280,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * total ordering (or as close as is required here) across
      * rebalancings, we compare classes and identityHashCodes as
      * tie-breakers.
+     * 当 bin 列表被树化、拆分或未树化时，我们将它们保持在相同的相对访问遍历顺序（即字段 Node.next）中，以更好地保留局部性，
+     * 并稍微简化调用 iterator.remove 的拆分和遍历的处理。在插入时使用比较器时，为了在重新平衡之间保持总排序（或此处要求的接近），
+     * 我们将类和 identityHashCodes 比较为决胜局。
      *
      * The use and transitions among plain vs tree modes is
      * complicated by the existence of subclass LinkedHashMap. See
@@ -286,13 +291,19 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * otherwise remain independent of these mechanics. (This also
      * requires that a map instance be passed to some utility methods
      * that may create new nodes.)
+     * 由于子类 LinkedHashMap 的存在，普通模式与树模式之间的使用和转换变得复杂。
+     * 请参阅下面定义为在插入、删除和访问时调用的钩子方法，这些方法允许 LinkedHashMap 内部保持独立于这些机制。
+     * （这还需要将地图实例传递给一些可能创建新节点的实用程序方法。）
      *
      * The concurrent-programming-like SSA-based coding style helps
      * avoid aliasing errors amid all of the twisty pointer operations.
+     * 类似并发编程的基于 SSA 的编码风格有助于避免在所有曲折的指针操作中出现别名错误。
+     *
      */
 
     /**
      * The default initial capacity - MUST be a power of two.
+     * 默认初始容量 - 必须是 2 的幂。 => 2^4
      */
     static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
 
@@ -300,13 +311,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * The maximum capacity, used if a higher value is implicitly specified
      * by either of the constructors with arguments.
      * MUST be a power of two <= 1<<30.
+     * 最大容量，如果一个更高的值由任何一个带参数的构造函数隐式指定时使用。必须是 2 <= 1<<30 的幂。
+     *
      */
-    static final int MAXIMUM_CAPACITY = 1 << 30;
+    static final int MAXIMUM_CAPACITY = 1 << 30;// 最大容量
 
     /**
      * The load factor used when none specified in constructor.
+     * 构造函数中未指定时使用的负载因子。
+     *
      */
-    static final float DEFAULT_LOAD_FACTOR = 0.75f;
+    static final float DEFAULT_LOAD_FACTOR = 0.75f; // 默认负载系数
 
     /**
      * The bin count threshold for using a tree rather than list for a
@@ -315,27 +330,36 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * than 2 and should be at least 8 to mesh with assumptions in
      * tree removal about conversion back to plain bins upon
      * shrinkage.
+     * 使用树而不是列表的 bin 计数阈值。将元素添加到至少具有这么多节点的 bin 时，bin 将转换为树。
+     * 该值必须大于 2 并且应该至少为 8，以便与树移除中关于在收缩时转换回普通 bin 的假设相吻合。
+     *
      */
-    static final int TREEIFY_THRESHOLD = 8;
+    static final int TREEIFY_THRESHOLD = 8; // 树形阈值
 
     /**
      * The bin count threshold for untreeifying a (split) bin during a
      * resize operation. Should be less than TREEIFY_THRESHOLD, and at
      * most 6 to mesh with shrinkage detection under removal.
+     * 在调整大小操作期间 untreeifying（拆分）bin 的 bin 计数阈值。
+     * 应小于 TREEIFY_THRESHOLD，并且最多 6 以在移除时进行收缩检测。
+     *
      */
-    static final int UNTREEIFY_THRESHOLD = 6;
+    static final int UNTREEIFY_THRESHOLD = 6; // 取消阈值
 
     /**
      * The smallest table capacity for which bins may be treeified.
      * (Otherwise the table is resized if too many nodes in a bin.)
      * Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts
      * between resizing and treeification thresholds.
+     * 可对其进行树化的 bin 的最小表容量。 （否则，如果 bin 中有太多节点，则调整表的大小。）
+     * 应至少为 4 TREEIFY_THRESHOLD 以避免调整大小和树化阈值之间的冲突。
      */
-    static final int MIN_TREEIFY_CAPACITY = 64;
+    static final int MIN_TREEIFY_CAPACITY = 64; // 最小树形容量
 
     /**
      * Basic hash bin node, used for most entries.  (See below for
      * TreeNode subclass, and in LinkedHashMap for its Entry subclass.)
+     * 基本哈希 bin 节点，用于大多数条目。 （参见下面的 TreeNode 子类，以及 LinkedHashMap 中的 Entry 子类。）
      */
     static class Node<K,V> implements Entry<K,V> {
         final int hash;
