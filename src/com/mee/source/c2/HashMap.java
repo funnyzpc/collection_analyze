@@ -379,9 +379,11 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         public final String toString() { return key + "=" + value; }
 
         public final int hashCode() {
+            // key的hashCode 与 value的hashCode做异或元素暗得到的Node的hashCode
             return Objects.hashCode(key) ^ Objects.hashCode(value);
         }
 
+        // 设置值的时候是将旧值返回，新的替换旧的
         public final V setValue(V newValue) {
             V oldValue = value;
             value = newValue;
