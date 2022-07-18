@@ -391,19 +391,19 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         }
 
         public final boolean equals(Object o) {
+            // 对象是否相等，是否 K/V 相等
             if (o == this)
                 return true;
             if (o instanceof Map.Entry) {
                 Entry<?,?> e = (Entry<?,?>)o;
-                if (Objects.equals(key, e.getKey()) &&
-                        Objects.equals(value, e.getValue()))
+                if (Objects.equals(key, e.getKey()) && Objects.equals(value, e.getValue()))
                     return true;
             }
             return false;
         }
     }
 
-    /* ---------------- Static utilities -------------- */
+    /* ---------------- Static utilities （静态实用程序）-------------- */
 
     /**
      * Computes key.hashCode() and spreads (XORs) higher bits of hash
@@ -420,8 +420,16 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * cheapest possible way to reduce systematic lossage, as well as
      * to incorporate impact of the highest bits that would otherwise
      * never be used in index calculations because of table bounds.
+     * 计算 key.hashCode() 并将哈希的较高位传播（XOR）到较低位。由于该表使用二次幂掩码，因此仅在当前掩码之上位变化的散列集将始终发生冲突。
+     * （已知的例子是在小表中保存连续整数的 Float 键集。）因此，我们应用了一种变换，将高位的影响向下传播。
+     * 在位扩展的速度、实用性和质量之间存在折衷。因为许多常见的散列集已经合理分布（所以不要从传播中受益），
+     * 并且因为我们使用树来处理 bin 中的大量冲突，我们只是以最便宜的方式对一些移位的位进行异或，以减少系统损失，
+     * 以及合并最高位的影响，否则由于表边界，这些最高位将永远不会用于索引计算。
+     *
      */
     static final int hash(Object key) {
+        // TODO 计算hash的方式 hashcode ^ hashcode>>>16位置
+        // >>运算符是有符号的右移运算符,而>>>是无符号的右移运算符
         int h;
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
@@ -429,14 +437,24 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Returns x's Class if it is of the form "class C implements
      * Comparable<C>", else null.
+     * 如果 x 的类是“类 C 实现 Comparable<C>”的形式，则返回 x 的类，否则返回 null。
      */
     static Class<?> comparableClassFor(Object x) {
+        // TODO 返回的是类C的原始类型，具体实现不大看得懂
         if (x instanceof Comparable) {
-            Class<?> c; Type[] ts, as; Type t; ParameterizedType p;
-            if ((c = x.getClass()) == String.class) // bypass checks
+            Class<?> c;
+            Type[] ts, as;
+            Type t;
+            ParameterizedType p; // 参数化类型
+            if ((c = x.getClass()) == String.class) // bypass checks 绕过检查
                 return c;
+            // 从c获取通用接口
+            // 返回表示由该对象表示的类或接口直接实现的接口的类型。
             if ((ts = c.getGenericInterfaces()) != null) {
                 for (int i = 0; i < ts.length; ++i) {
+                    // ParameterizedType： 参数化类型
+                    // getRawType：获取原始类型
+                    // getActualTypeArguments：获取实际类型参数
                     if (((t = ts[i]) instanceof ParameterizedType) &&
                             ((p = (ParameterizedType)t).getRawType() ==
                                     Comparable.class) &&
@@ -452,15 +470,18 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Returns k.compareTo(x) if x matches kc (k's screened comparable
      * class), else 0.
+     * 比较可比物::如果 x 匹配 kc（k 的筛选可比类），则返回 k.compareTo(x)，否则返回 0。
      */
     @SuppressWarnings({"rawtypes","unchecked"}) // for cast to Comparable
     static int compareComparables(Class<?> kc, Object k, Object x) {
+        // x的class类型不是kc返回0，否则x与k进行比较
         return (x == null || x.getClass() != kc ? 0 :
                 ((Comparable)k).compareTo(x));
     }
 
     /**
      * Returns a power of two size for the given target capacity.
+     * 返回给定目标容量的 2 次方。
      */
     static final int tableSizeFor(int cap) {
         int n = cap - 1;
