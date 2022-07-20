@@ -484,6 +484,16 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * 返回给定目标容量的 2 次方。
      */
     static final int tableSizeFor(int cap) {
+        // 表尺寸::根據初始容量算出这个初始容量对应的临界值，这个临界值就是实际的容量
+        // 一般规律是 临界值为 这个初始容量相临近的且为2的幂次的值且>=這個初始容量 ，以下为一般规律
+        // 且最大为2的30次方（MAXIMUM_CAPACITY），大于MAXIMUM_CAPACITY的均以MAXIMUM_CAPACITY作为临界值(实际容量)
+        // initialCapacity=0 => threshold=1
+        // initialCapacity=1 => threshold=1
+        // initialCapacity=2 => threshold=2
+        // initialCapacity=3 => threshold=4
+        // initialCapacity=4 => threshold=4
+        // initialCapacity=5 => threshold=8
+        // initialCapacity=9 => threshold=16
         int n = cap - 1;
         n |= n >>> 1;
         n |= n >>> 2;
@@ -500,17 +510,22 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * necessary. When allocated, length is always a power of two.
      * (We also tolerate length zero in some operations to allow
      * bootstrapping mechanics that are currently not needed.)
+     * 该表在首次使用时初始化，并根据需要调整大小。分配时，长度始终是 2 的幂。
+     * （我们还在某些操作中允许长度为零，以允许当前不需要的引导机制。）
      */
     transient Node<K,V>[] table;
 
     /**
      * Holds cached entrySet(). Note that AbstractMap fields are used
      * for keySet() and values().
+     * 保存缓存的 entrySet()。请注意，AbstractMap 字段用于 keySet() 和 values()。
+     * 也就是entrySet这个成员变量在HashMap中定义，他的keySet以及values是AbstractMap的重写
      */
     transient Set<Entry<K,V>> entrySet;
 
     /**
      * The number of key-value mappings contained in this map.
+     * 此映射中包含的键值映射的数量。
      */
     transient int size;
 
@@ -520,6 +535,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * the HashMap or otherwise modify its internal structure (e.g.,
      * rehash).  This field is used to make iterators on Collection-views of
      * the HashMap fail-fast.  (See ConcurrentModificationException).
+     * 此 HashMap 已被结构修改的次数 结构修改是指更改 HashMap 中的映射数量或以其他方式修改其内部结构（例如，重新散列）的那些。
+     * 该字段用于使 HashMap 的 Collection-views 上的迭代器快速失败。 （请参阅 ConcurrentModificationException）。
      */
     transient int modCount;
 
