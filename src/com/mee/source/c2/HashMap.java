@@ -759,9 +759,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      *
      * @param   key   The key whose presence in this map is to be tested
      *  要测试在此映射中是否存在的键
-     * @return <tt>true</tt> if this map contains a mapping for the specified
+     * @return <tt>true</tt> if this map contains a mapping for the specified key.
      *  如果此映射包含指定键的映射，则为 true。
-     * key.
+     *
      */
     public boolean containsKey(Object key) {
         // 当前方法是必要的，它弥补了get方法存在的问题，也就是null的问题
@@ -773,69 +773,86 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Associates the specified value with the specified key in this map.
      * If the map previously contained a mapping for the key, the old
      * value is replaced.
+     * 将指定的值与此映射中的指定键相关联。如果映射先前包含键的映射，则替换旧值。
      *
-     * @param key key with which the specified value is to be associated
-     * @param value value to be associated with the specified key
+     * @param key key with which the specified value is to be associated 与指定值关联的键
+     * @param value value to be associated with the specified key 与指定键关联的值
      * @return the previous value associated with <tt>key</tt>, or
      *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
      *         (A <tt>null</tt> return can also indicate that the map
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
+     * 与 key 关联的前一个值，如果没有 key 映射，则返回 null。 （返回 null 还可以指示映射先前将 null 与 key 关联。）
      */
     public V put(K key, V value) {
+        // k/v相关联，并作为一个Node(可能普通Node也可能是TreeNode)
+        // 如果存在key，则返回原value
+        // 如果value=null或存在value的Node为null，均返回null
         return putVal(hash(key), key, value, false, true);
     }
 
     /**
      * Implements Map.put and related methods.
+     * 实现 Map.put 和相关方法。
      *
      * @param hash hash for key
      * @param key the key
      * @param value the value to put
-     * @param onlyIfAbsent if true, don't change existing value
-     * @param evict if false, the table is in creation mode.
-     * @return previous value, or null if none
+     * @param onlyIfAbsent if true, don't change existing value 如果为真，则不要更改现有值
+     * @param evict if false, the table is in creation mode. 如果为 false，则表处于创建模式。
+     * @return previous value, or null if none  前一个值，如果没有，则为 null
      */
-    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
-                   boolean evict) {
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
         Node<K,V>[] tab; Node<K,V> p; int n, i;
+        // 如果table为null则先建一个
         if ((tab = table) == null || (n = tab.length) == 0)
             n = (tab = resize()).length;
+        // 如果起始节点为空则新建一个起始节点
         if ((p = tab[i = (n - 1) & hash]) == null)
             tab[i] = newNode(hash, key, value, null);
         else {
-            Node<K,V> e; K k;
-            if (p.hash == hash &&
-                    ((k = p.key) == key || (key != null && key.equals(k))))
-                e = p;
+            Node<K,V> e;  // 原node
+            K k; // 活动节点的key
+            if (p.hash == hash &&  ((k = p.key) == key || (key != null && key.equals(k))))
+                e = p; // 原节点给e
             else if (p instanceof TreeNode)
+                // 对于树节点 需采用树节点的处理方式 -> putTreeVal
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
+                // 以下为普通节点的处理方式(链表)
                 for (int binCount = 0; ; ++binCount) {
+                    // next节点为空 直接新增一个包含当前待插入到k/v的节点
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
+                        // 普通链表与树之间会有一个阀值(TREEIFY_THRESHOLD),大于等于 TREEIFY_THRESHOLD-1 时需要进行树化
+                        // TREEIFY_THRESHOLD：树形阈值=8
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
-                            treeifyBin(tab, hash);
+                            treeifyBin(tab, hash); // 树化
                         break;
                     }
-                    if (e.hash == hash &&
-                            ((k = e.key) == key || (key != null && key.equals(k))))
+                    // 找到这个节点只需要break即可，也不会再执行 p=e
+                    if (e.hash == hash &&  ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
-                    p = e;
+                    p = e; // 因为e=p.next，进行到下一个节点之前需要将p指向e,p=e即为p更新到下一个节点
                 }
             }
+            // 注意，如果找到这个key所对应的老节点只会在节点内更新value即可，因为不存在map大小的变更，则版本(modCount)也不会变
             if (e != null) { // existing mapping for key
                 V oldValue = e.value;
+                // oh，明白，这个onlyIfAbsent代表在找到老节点后是否更新老节点的值，这个onlyIfAbsent一般是false(更新)
+                // TODO 但是 oldValue==null 又会进入更新，这就不太理解咯，后面再看
                 if (!onlyIfAbsent || oldValue == null)
                     e.value = value;
-                afterNodeAccess(e);
-                return oldValue;
+                afterNodeAccess(e); // TODO  允许 LinkedHashMap 后操作的回调
+                return oldValue; // 返回老节点的值
             }
         }
+        // 更新下版本，此时已经表明当前的k/v是插入到map中，而不是替换老节点
         ++modCount;
+        // 更新size的同时也要检查是否需要调整大小->resize
         if (++size > threshold)
             resize();
-        afterNodeInsertion(evict);
-        return null;
+        afterNodeInsertion(evict); // TODO 允许 LinkedHashMap 后操作的回调
+        return null; // 因为k/v是插入的，所以不存在老节点，故返回null
     }
 
     /**
@@ -844,7 +861,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Otherwise, because we are using power-of-two expansion, the
      * elements from each bin must either stay at same index, or move
      * with a power of two offset in the new table.
-     *
+     * 初始化或加倍表大小。如果为空，则按照字段阈值中保存的初始容量目标进行分配。
+     * 否则，因为我们使用二次幂展开，每个 bin 中的元素必须保持相同的索引，或者在新表中以二次幂的偏移量移动。
      * @return the table
      */
     final Node<K,V>[] resize() {
@@ -924,6 +942,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Replaces all linked nodes in bin at index for given hash unless
      * table is too small, in which case resizes instead.
+     * 替换给定哈希索引处 bin 中的所有链接节点，除非表太小，在这种情况下调整大小。
      */
     final void treeifyBin(Node<K,V>[] tab, int hash) {
         int n, index; Node<K,V> e;

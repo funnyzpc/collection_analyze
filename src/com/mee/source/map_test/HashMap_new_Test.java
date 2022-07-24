@@ -7,6 +7,7 @@ public class HashMap_new_Test {
     public static void main(String[] args) {
         HashMap map = new HashMap(10,0.8F);
         System.out.println(map);
+//        map.putIfAbsent()
 //        map.putAll();
 
     }
