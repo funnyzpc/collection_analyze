@@ -542,6 +542,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * The next size value at which to resize (capacity * load factor).
+     * 要调整大小的下一个大小值（容量负载因子）。
      *
      * @serial
      */
@@ -549,56 +550,65 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     // Additionally, if the table array has not been allocated, this
     // field holds the initial array capacity, or zero signifying
     // DEFAULT_INITIAL_CAPACITY.)
+    // （javadoc 描述在序列化时为真。此外，如果尚未分配表数组，则此字段保存初始数组容量，或零表示 DEFAULT_INITIAL_CAPACITY。）
     int threshold;
 
     /**
      * The load factor for the hash table.
-     *
+     * 哈希表的负载因子。
      * @serial
      */
     final float loadFactor;
 
-    /* ---------------- Public operations -------------- */
+    /* ---------------- Public operations 公共运营 -------------- */
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the specified initial
      * capacity and load factor.
+     * 构造一个具有指定初始容量和负载因子的空 HashMap
      *
-     * @param  initialCapacity the initial capacity
-     * @param  loadFactor      the load factor
-     * @throws IllegalArgumentException if the initial capacity is negative
-     *         or the load factor is nonpositive
+     * @param  initialCapacity the initial capacity 初始容量
+     * @param  loadFactor      the load factor  负载系数
+     * @throws IllegalArgumentException if the initial capacity is negative 如果初始容量为负
+     *         or the load factor is nonpositive 或负载因子为非正数
      */
     public HashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException("Illegal initial capacity: " +
                     initialCapacity);
+        // 限制最大容量
         if (initialCapacity > MAXIMUM_CAPACITY)
             initialCapacity = MAXIMUM_CAPACITY;
+        // 负载因子为数且值>0
         if (loadFactor <= 0 || Float.isNaN(loadFactor))
             throw new IllegalArgumentException("Illegal load factor: " +
                     loadFactor);
+        // 负载因子直接赋值，不做检查,这个参数做什么用后续会说到
         this.loadFactor = loadFactor;
+        // 阀值/临界点：目标容量(initialCapacity)的 2 次方。
         this.threshold = tableSizeFor(initialCapacity);
     }
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the specified initial
      * capacity and the default load factor (0.75).
+     * 构造一个具有指定初始容量和默认加载因子 (0.75) 的空 HashMap
      *
      * @param  initialCapacity the initial capacity.
      * @throws IllegalArgumentException if the initial capacity is negative.
      */
     public HashMap(int initialCapacity) {
+        // 应为要对initialCapacity进行处理，这里直接调用完整的构造方法(以上)
         this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
      * (16) and the default load factor (0.75).
+     * 构造一个具有默认初始容量 (16) 和默认加载因子 (0.75) 的空 HashMap
      */
     public HashMap() {
-        this.loadFactor = DEFAULT_LOAD_FACTOR; // all other fields defaulted
+        this.loadFactor = DEFAULT_LOAD_FACTOR; // all other fields defaulted 所有其他字段默认
     }
 
     /**
@@ -606,37 +616,49 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * specified <tt>Map</tt>.  The <tt>HashMap</tt> is created with
      * default load factor (0.75) and an initial capacity sufficient to
      * hold the mappings in the specified <tt>Map</tt>.
+     * 构造一个与指定 <tt>Map<tt> 具有相同映射的新 <tt>HashMap<tt>。
+     * <tt>HashMap<tt> 是使用默认加载因子 (0.75) 和足以保存指定 <tt>Map<tt> 中的映射的初始容量创建的。
      *
      * @param   m the map whose mappings are to be placed in this map
      * @throws  NullPointerException if the specified map is null
      */
     public HashMap(Map<? extends K, ? extends V> m) {
         this.loadFactor = DEFAULT_LOAD_FACTOR;
+        // 将传入的map放入当前map，具体的后续会讲
         putMapEntries(m, false);
     }
 
     /**
      * Implements Map.putAll and Map constructor.
+     * 实现 Map.putAll 和 Map 构造函数。(意思是putAll也调用此方法)
      *
      * @param m the map
-     * @param evict false when initially constructing this map, else
+     * @param evict 驱逐 false when initially constructing this map, else
      * true (relayed to method afterNodeInsertion).
+     * 最初构造此映射时为 false，否则为 true（与方法 afterNode Insertion 相关）。
+     *
      */
     final void putMapEntries(Map<? extends K, ? extends V> m, boolean evict) {
         int s = m.size();
+        // m为空，则无需执行此段逻辑
         if (s > 0) {
-            if (table == null) { // pre-size
+            // 当前table为空时
+            if (table == null) { // pre-size 预尺寸
+                // 容量/负载因子(0.75F) + 1,这其实是算出一个目标容量大小,这里+1的问题是算出的容量是向上取整的
                 float ft = ((float)s / loadFactor) + 1.0F;
                 int t = ((ft < (float)MAXIMUM_CAPACITY) ?
                         (int)ft : MAXIMUM_CAPACITY);
+                // 如果大于当前的阀值则需要重新计算阀值
                 if (t > threshold)
                     threshold = tableSizeFor(t);
             }
             else if (s > threshold)
-                resize();
+                resize(); // 调整大小，这个后续会说
+            // 参数一个个添加至当前map
             for (Entry<? extends K, ? extends V> e : m.entrySet()) {
                 K key = e.getKey();
                 V value = e.getValue();
+                // 添加元素具体执行方法，注意第一个参数为key的hash值，函数后续会讲解
                 putVal(hash(key), key, value, false, evict);
             }
         }
@@ -644,64 +666,85 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Returns the number of key-value mappings in this map.
+     * 返回此映射中键值映射的数量。
      *
      * @return the number of key-value mappings in this map
      */
     public int size() {
+        // 注意，这个值是当前map中k/v键值实际数量，跟threshold不一样！
         return size;
     }
 
     /**
      * Returns <tt>true</tt> if this map contains no key-value mappings.
+     * 如果此映射不包含键值映射，则返回 true。
      *
      * @return <tt>true</tt> if this map contains no key-value mappings
      */
     public boolean isEmpty() {
+        // size是int基础类型，默认值就是0也为空
         return size == 0;
     }
 
     /**
      * Returns the value to which the specified key is mapped,
      * or {@code null} if this map contains no mapping for the key.
+     * 返回指定键映射到的值，如果此映射不包含该键的映射，则返回 null。
      *
      * <p>More formally, if this map contains a mapping from a key
      * {@code k} to a value {@code v} such that {@code (key==null ? k==null :
      * key.equals(k))}, then this method returns {@code v}; otherwise
      * it returns {@code null}.  (There can be at most one such mapping.)
+     * 更正式地说，如果此映射包含从键 k 到值 v 的映射，使得 (key==null ? k==null : key.equals(k))，
+     * 则此方法返回 v；否则返回null。 （最多可以有一个这样的映射。）
      *
      * <p>A return value of {@code null} does not <i>necessarily</i>
      * indicate that the map contains no mapping for the key; it's also
      * possible that the map explicitly maps the key to {@code null}.
      * The {@link #containsKey containsKey} operation may be used to
      * distinguish these two cases.
+     * 返回值为 null 并不一定表示该映射不包含该键的映射；映射也可能将键显式映射为空。 containsKey 操作可用于区分这两种情况。另请参阅：放置（对象，对象）
      *
      * @see #put(Object, Object)
      */
     public V get(Object key) {
         Node<K,V> e;
+        // 如果没有key这个node则返回null,否则返回节点的value,键值对是在同一个Node对象内
+        // 重要对是 官方注释中也有说：返回对Node对象的value也有可能为null，所以并不能通过value是否为null来判断是否有存储这个null节点
         return (e = getNode(hash(key), key)) == null ? null : e.value;
     }
 
     /**
      * Implements Map.get and related methods.
+     * 实现 Map.get 和相关方法。
      *
-     * @param hash hash for key
-     * @param key the key
-     * @return the node, or null if none
+     * @param hash hash for key 键的哈希
+     * @param key the key 键
+     * @return the node, or null if none 节点，如果没有则为 null
      */
     final Node<K,V> getNode(int hash, Object key) {
+        // tab: 为当前map的一个引用(table)
+        // first: 为map第一个节点,具体节点获取方式为 tab[(tab.length-1) & hash]
+        // e: 表示下一个节点，也是活动节点，从first的引用开始获取
+        // n: tab的大小,也等于table.length
+        // k: 为活动节点的key(会在循环内不断变动引用)，其值为对应活动节点(first或e)的key
         Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
-        if ((tab = table) != null && (n = tab.length) > 0 &&
-                (first = tab[(n - 1) & hash]) != null) {
-            if (first.hash == hash && // always check first node
-                    ((k = first.key) == key || (key != null && key.equals(k))))
+        if ((tab = table) != null && (n = tab.length) > 0 &&  (first = tab[(n - 1) & hash]) != null) {
+            // always check first node 总是检查第一个节点的hash，以及key
+            // 其实也就是检查第一个node是否是目的(需返回的node)节点，是就无需往下找了～
+            if (first.hash == hash && ((k = first.key) == key || (key != null && key.equals(k))))
                 return first;
             if ((e = first.next) != null) {
+                // 以下分两种情况
+                // 第一种：这个节点为树节点(具体为红黑树),通过树的形式找，找到即直接返回，
+                //       对于此种情况，也说明了一种问题：如果当前map第一个节点为TreeNode则其他节点也为TreeNode
+                // 第二种：这个节点为普通节点(具体为链表的形式)，通过其引用的(next)后继节点查找 类似于iterator的next
                 if (first instanceof TreeNode)
+                    // TreeNode也是Node接口的一个实现，可以进行强转，这里直接用TreeNode的实现进行查找
                     return ((TreeNode<K,V>)first).getTreeNode(hash, key);
                 do {
-                    if (e.hash == hash &&
-                            ((k = e.key) == key || (key != null && key.equals(k))))
+                    // 对于e的判断与first的判断是一致的
+                    if (e.hash == hash && ((k = e.key) == key || (key != null && key.equals(k))))
                         return e;
                 } while ((e = e.next) != null);
             }
@@ -712,12 +755,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Returns <tt>true</tt> if this map contains a mapping for the
      * specified key.
+     * 如果此映射包含指定键的映射，则返回 true。
      *
      * @param   key   The key whose presence in this map is to be tested
+     *  要测试在此映射中是否存在的键
      * @return <tt>true</tt> if this map contains a mapping for the specified
+     *  如果此映射包含指定键的映射，则为 true。
      * key.
      */
     public boolean containsKey(Object key) {
+        // 当前方法是必要的，它弥补了get方法存在的问题，也就是null的问题
+        // 因为null是可以保存为一个节点的，如果根本没有保存就不存在key=null的节点（node）
         return getNode(hash(key), key) != null;
     }
 
