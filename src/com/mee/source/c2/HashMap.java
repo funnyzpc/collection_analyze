@@ -856,6 +856,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     /**
+     * 调整大小
      * Initializes or doubles table size.  If null, allocates in
      * accord with initial capacity target held in field threshold.
      * Otherwise, because we are using power-of-two expansion, the
@@ -868,25 +869,29 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     final Node<K,V>[] resize() {
         Node<K,V>[] oldTab = table;
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
-        int oldThr = threshold;
+        int oldThr = threshold; // 临界值
         int newCap, newThr = 0;
         if (oldCap > 0) {
+            // 原容量如果已经大于 指定的临界值，则临界值就是Integer.MAX_VALUE,table也还是原table，容量也无需改变
             if (oldCap >= MAXIMUM_CAPACITY) {
                 threshold = Integer.MAX_VALUE;
                 return oldTab;
             }
+            // 新的容量默认是往左移1位(<<1 就是x2)，同时它的临界值是 2^4(16)<=容量<2^30 这个范围内的时候临界值大小也往左移动一位(<<1 也即x2)
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                     oldCap >= DEFAULT_INITIAL_CAPACITY)
-                newThr = oldThr << 1; // double threshold
+                newThr = oldThr << 1; // double threshold 临界值*2
         }
-        else if (oldThr > 0) // initial capacity was placed in threshold
-            newCap = oldThr;
-        else {               // zero initial threshold signifies using defaults
-            newCap = DEFAULT_INITIAL_CAPACITY;
-            newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+        else if (oldThr > 0) // initial capacity was placed in threshold 初始容量被置于阈值
+            newCap = oldThr; // 新的容量等于老的临界值
+        else {               // zero initial threshold signifies using defaults 零初始阈值表示使用默认值
+            newCap = DEFAULT_INITIAL_CAPACITY; // 初始化容量是16
+            newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY); //临界值=16*0.75（默认负载系数）=12
         }
         if (newThr == 0) {
+            // 新的临界值
             float ft = (float)newCap * loadFactor;
+            // 新的临界值以及容量均 < 2^30 时候，直接更新为新的临界值，否则新的临界值为Integer.MAX_VALUE
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
                     (int)ft : Integer.MAX_VALUE);
         }
@@ -894,43 +899,46 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         @SuppressWarnings({"rawtypes","unchecked"})
         Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
         table = newTab;
+        // TODO 以下功能没咋看懂，以后再具体解释
         if (oldTab != null) {
             for (int j = 0; j < oldCap; ++j) {
-                Node<K,V> e;
-                if ((e = oldTab[j]) != null) {
-                    oldTab[j] = null;
+                Node<K,V> e; // 活动的node，也就是当前节点，理解这一点很重要
+                if ((e = oldTab[j]) != null) { // 这里这样判断实在没必要
+                    oldTab[j] = null; // 清空这个索引位置的Node使之gc
                     if (e.next == null)
-                        newTab[e.hash & (newCap - 1)] = e;
+                        newTab[e.hash & (newCap - 1)] = e; // 不存在下一个节点则新table直接赋值为e
                     else if (e instanceof TreeNode)
+                        // 对于数节点则采用树的处理方式
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
-                    else { // preserve order
+                    else { // preserve order 维护秩序
+                        // 头或尾巴的高位或低位节点
                         Node<K,V> loHead = null, loTail = null;
                         Node<K,V> hiHead = null, hiTail = null;
                         Node<K,V> next;
                         do {
                             next = e.next;
+                            // 一般是最后一个节点会进入if内，
                             if ((e.hash & oldCap) == 0) {
                                 if (loTail == null)
                                     loHead = e;
                                 else
                                     loTail.next = e;
                                 loTail = e;
-                            }
-                            else {
+                            } else {
                                 if (hiTail == null)
                                     hiHead = e;
                                 else
                                     hiTail.next = e;
                                 hiTail = e;
                             }
-                        } while ((e = next) != null);
+                        } while ((e = next) != null); // 循环到最后这个e就是null
                         if (loTail != null) {
                             loTail.next = null;
-                            newTab[j] = loHead;
+                            newTab[j] = loHead; // 这个 loTail 似乎与 loHead 是一样的，都是e
                         }
                         if (hiTail != null) {
                             hiTail.next = null;
-                            newTab[j + oldCap] = hiHead;
+                            newTab[j + oldCap] = hiHead; // 因为Node[]扩容之后大小为之前到两倍，所以这里的j+oldCap是不存在抛错这种行为的
                         }
                     }
                 }
