@@ -954,22 +954,25 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      */
     final void treeifyBin(Node<K,V>[] tab, int hash) {
         int n, index; Node<K,V> e;
+        //  MIN_TREEIFY_CAPACITY: 最小树形容量
         if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
-            resize();
+            resize(); // 调整大小
+        // 这里面(else if)的条件似乎是找到最后一个节点
         else if ((e = tab[index = (n - 1) & hash]) != null) {
             TreeNode<K,V> hd = null, tl = null;
             do {
-                TreeNode<K,V> p = replacementTreeNode(e, null);
+                TreeNode<K,V> p = replacementTreeNode(e, null); // 替换为树节点
                 if (tl == null)
                     hd = p;
                 else {
+                    // TODO 这个似乎是在做双向绑定，整体还是不大明白
                     p.prev = tl;
                     tl.next = p;
                 }
                 tl = p;
             } while ((e = e.next) != null);
             if ((tab[index] = hd) != null)
-                hd.treeify(tab);
+                hd.treeify(tab);// 树化
         }
     }
 
@@ -977,38 +980,62 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Copies all of the mappings from the specified map to this map.
      * These mappings will replace any mappings that this map had for
      * any of the keys currently in the specified map.
+     * 将所有映射从指定映射复制到此映射。这些映射将[替换]此映射对当前指定映射中的任何键的任何映射。
      *
-     * @param m mappings to be stored in this map
-     * @throws NullPointerException if the specified map is null
+     * @param m mappings to be stored in this map 要存储在此地图中的映射
+     * @throws NullPointerException if the specified map is null 如果指定的地图为空
      */
     public void putAll(Map<? extends K, ? extends V> m) {
+        // 当前功能很明显：将传入的m里面所有的kv放入到当前map内，相同的的映射将被替换
+        // example:
+        //  HashMap<String,String> m1 = new HashMap<String,String>();
+        //  m1.put("A","1");
+        //  m1.put("B","2");
+        //  m1.put("C","3");
+        //
+        //  HashMap<String,String> m2 = new HashMap<String,String>();
+        //  m2.put("A","K");
+        //  m2.put("B","K");
+        //  m2.put("D","4");
+        //
+        //  m1.putAll(m2);
+        //
+        //  System.out.println(m1); // {A=K, B=K, C=3, D=4}
+        //  System.out.println(m2); // {A=K, B=K, D=4}
         putMapEntries(m, true);
     }
 
     /**
      * Removes the mapping for the specified key from this map if present.
+     * 如果存在，则从此映射中删除指定键的映射。
      *
-     * @param  key key whose mapping is to be removed from the map
+     * @param  key key whose mapping is to be removed from the map 要从映射中删除其映射的键
      * @return the previous value associated with <tt>key</tt>, or
      *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
      *         (A <tt>null</tt> return can also indicate that the map
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
+     *         与 key 关联的前一个值，如果没有 key 映射，则返回 null。
+     *         （返回 null 还可以指示映射先前将 null 与 key 关联。）
+     *         TODO 这官方注释着实看不明白。。。
      */
     public V remove(Object key) {
+        // 删除key，本质上就是删除节点，这个节点可能是普通节点也可能是树节点，返回key所对应的value，如果没有映射的value则返回null
+        // TODO 额，具体移除还是看removeNode...
         Node<K,V> e;
         return (e = removeNode(hash(key), key, null, false, true)) == null ?
                 null : e.value;
     }
 
     /**
-     * Implements Map.remove and related methods.
+     * Implements Map.remove and related methods. 实现 Map.remove 和相关方法。
      *
-     * @param hash hash for key
-     * @param key the key
-     * @param value the value to match if matchValue, else ignored
-     * @param matchValue if true only remove if value is equal
-     * @param movable if false do not move other nodes while removing
-     * @return the node, or null if none
+     * @param hash hash for key 键的哈希
+     * @param key the key key自身
+     * @param value the value to match if matchValue, else ignored  如果匹配值，则要匹配的值，否则忽略
+     * @param matchValue if true only remove if value is equal  如果为真，则仅在值相等时删除：说人话就是这个值为true时候会讲通过key找到的value的Node对象删除
+     *                                                                                  所以matchValue=true时 value传进来才有意义，本质上就是匹配值删除
+     * @param movable if false do not move other nodes while removing   如果为假(false)，则在删除时不要移动其他节点: 也就是是否移动其他节点
+     * @return the node, or null if none    节点，如果没有则为 null: 节点不存在返回null
      */
     final Node<K,V> removeNode(int hash, Object key, Object value,
                                boolean matchValue, boolean movable) {
