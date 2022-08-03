@@ -1032,28 +1032,30 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @param hash hash for key 键的哈希
      * @param key the key key自身
      * @param value the value to match if matchValue, else ignored  如果匹配值，则要匹配的值，否则忽略
-     * @param matchValue if true only remove if value is equal  如果为真，则仅在值相等时删除：说人话就是这个值为true时候会讲通过key找到的value的Node对象删除
-     *                                                                                  所以matchValue=true时 value传进来才有意义，本质上就是匹配值删除
+     * @param matchValue if true only remove if value is equal  如果为真，则仅在值相等时删除：说人话就是为true时不会在找到Node(hash、key)后继续比较value是否一致
+     *                                                                                  所以matchValue=false时 value传进来才有意义，本质上就是匹配值删除
      * @param movable if false do not move other nodes while removing   如果为假(false)，则在删除时不要移动其他节点: 也就是是否移动其他节点
      * @return the node, or null if none    节点，如果没有则为 null: 节点不存在返回null
      */
-    final Node<K,V> removeNode(int hash, Object key, Object value,
-                               boolean matchValue, boolean movable) {
+    final Node<K,V> removeNode(int hash, Object key, Object value, boolean matchValue, boolean movable) {
+        // tab=table,n=table.length     index=n-1,p=table[index & hash]
+        // n是table的长度，p是当前活跃的Node，index为当前活跃的Node的索引
         Node<K,V>[] tab; Node<K,V> p; int n, index;
-        if ((tab = table) != null && (n = tab.length) > 0 &&
-                (p = tab[index = (n - 1) & hash]) != null) {
+        if ((tab = table) != null && (n = tab.length) > 0 && (p = tab[index = (n - 1) & hash]) != null) {
+            // node可以理解为目标节点 即hash以及key都匹配的Node
             Node<K,V> node = null, e; K k; V v;
-            if (p.hash == hash &&
-                    ((k = p.key) == key || (key != null && key.equals(k))))
+            // 比较Node的Hash是否与传入的hash是否相等，Node的key(k)是否与传入的key是否相等
+            if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k))))
                 node = p;
             else if ((e = p.next) != null) {
+                // TODO 如果是树节点...
                 if (p instanceof TreeNode)
                     node = ((TreeNode<K,V>)p).getTreeNode(hash, key);
                 else {
+                    // 如果是普通节点
                     do {
-                        if (e.hash == hash &&
-                                ((k = e.key) == key ||
-                                        (key != null && key.equals(k)))) {
+                        // 依旧是比较hash以及key
+                        if ( e.hash == hash &&  ((k = e.key) == key || (key != null && key.equals(k))) ) {
                             node = e;
                             break;
                         }
@@ -1061,17 +1063,19 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     } while ((e = e.next) != null);
                 }
             }
-            if (node != null && (!matchValue || (v = node.value) == value ||
-                    (value != null && value.equals(v)))) {
+            // 下面这个matchValue这个传入的变量默认是false，这个时候就无需再比较值(value),反之则需要比较值，这个就比较迷惑了...
+            // matchValue简单理解为 是否继续比较value
+            if (node != null && (!matchValue || (v = node.value) == value || (value != null && value.equals(v))) ) {
+                // 树节点走树的删除
                 if (node instanceof TreeNode)
-                    ((TreeNode<K,V>)node).removeTreeNode(this, tab, movable);
+                    ((TreeNode<K,V>)node).removeTreeNode(this, tab, movable);// movable 默认为true
                 else if (node == p)
-                    tab[index] = node.next;
+                    tab[index] = node.next;// node为桶的头节点
                 else
-                    p.next = node.next;
-                ++modCount;
-                --size;
-                afterNodeRemoval(node);
+                    p.next = node.next; // p是node的上一个节点的时候(do..while),一样将node节点空出来
+                ++modCount; // 版本
+                --size; // 实际容量
+                afterNodeRemoval(node); // 这个是LinkedHash的实现，内部为切断node的引用
                 return node;
             }
         }
@@ -1079,26 +1083,28 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     /**
-     * Removes all of the mappings from this map.
-     * The map will be empty after this call returns.
+     * Removes all of the mappings from this map.   从此map中删除所有映射。
+     * The map will be empty after this call returns.   此调用返回后，map将为空。
      */
     public void clear() {
         Node<K,V>[] tab;
-        modCount++;
+        modCount++; // 版本
         if ((tab = table) != null && size > 0) {
-            size = 0;
+            size = 0; // 实际元素个数
             for (int i = 0; i < tab.length; ++i)
-                tab[i] = null;
+                tab[i] = null; // 这里个人粗糙的理解为 仅仅切断了桶的引用，桶内的链表或树并不管。。。
         }
     }
 
     /**
      * Returns <tt>true</tt> if this map maps one or more keys to the
      * specified value.
+     * 如果此映射将一个或多个键映射到指定值，则返回 true。
      *
-     * @param value value whose presence in this map is to be tested
+     * @param value value whose presence in this map is to be tested    要测试其在此映射中的存在的值
      * @return <tt>true</tt> if this map maps one or more keys to the
      *         specified value
+     *         如果此映射将一个或多个键映射到指定值，则为 true
      */
     public boolean containsValue(Object value) {
         Node<K,V>[] tab; V v;
