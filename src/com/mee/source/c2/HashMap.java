@@ -1719,6 +1719,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @throws IOException if an I/O error occurs IO错误时
      *
      *  这个方法似乎么有调用的地方
+     *  将一个序列化对象读取到当前map中
      */
     private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
         // Read in the threshold (ignored), loadfactor, and any hidden stuff\
@@ -1726,15 +1727,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         s.defaultReadObject();
         // 重置配置参数
         reinitialize();
-        if (loadFactor <= 0 || Float.isNaN(loadFactor))
-            throw new InvalidObjectException("Illegal load factor: " +
-                    loadFactor);
+        if (loadFactor <= 0 || Float.isNaN(loadFactor)){
+            throw new InvalidObjectException("Illegal load factor: " + loadFactor);
+        }
         s.readInt();                // Read and ignore number of buckets
-        int mappings = s.readInt(); // Read number of mappings (size)
-        if (mappings < 0)
-            throw new InvalidObjectException("Illegal mappings count: " +
-                    mappings);
-        else if (mappings > 0) { // (if zero, use defaults)
+        int mappings = s.readInt(); // Read number of mappings (size) 映射的键值对数量，下面会根据这个映射数读取key&value
+        if (mappings < 0){
+            throw new InvalidObjectException("Illegal mappings count: " + mappings);
+        }else if (mappings > 0) { // (if zero, use defaults)
             // Size the table using given load factor only if within
             // range of 0.25...4.0
             float lf = Math.min(Math.max(0.25f, loadFactor), 4.0f);
@@ -1745,9 +1745,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                             MAXIMUM_CAPACITY :
                             tableSizeFor((int)fc));
             float ft = (float)cap * lf;
-            threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ?
-                    (int)ft : Integer.MAX_VALUE);
-
+            threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ? (int)ft : Integer.MAX_VALUE);
             // Check Map.Entry[].class since it's the nearest public type to
             // what we're actually creating.
             SharedSecrets.getJavaOISAccess().checkArray(s, Entry[].class, cap);
@@ -1768,19 +1766,21 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /* ------------------------------------------------------------ */
     // iterators
-
+    // 这个迭代器只是个抽象类，目标是服务于 KeyIterator 、ValueIterator、EntryIterator
     abstract class HashIterator {
         Node<K,V> next;        // next entry to return
         Node<K,V> current;     // current entry
         int expectedModCount;  // for fast-fail
-        int index;             // current slot
+        int index;             // current slot 当前槽也即当前桶的索引
 
         HashIterator() {
+            // 迭代时不允许外部修改删除
             expectedModCount = modCount;
             Node<K,V>[] t = table;
             current = next = null;
             index = 0;
-            if (t != null && size > 0) { // advance to first entry
+            if (t != null && size > 0) { // advance to first entry 前进到第一个条目
+                // 反向思维只要取到一个node不是null即为第一个node(current)
                 do {} while (index < t.length && (next = t[index++]) == null);
             }
         }
@@ -1792,10 +1792,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         final Node<K,V> nextNode() {
             Node<K,V>[] t;
             Node<K,V> e = next;
-            if (modCount != expectedModCount)
+            // 迭代时不允许外部删除
+            if (modCount != expectedModCount){
                 throw new ConcurrentModificationException();
-            if (e == null)
+            }
+            if (e == null){
                 throw new NoSuchElementException();
+            }
+            // 这个地方有点儿弯弯绕（只是代码写的很凝练紧凑）
+            // 做了两件事儿：
+            // 1从当前node(节点)滑向下一个node
+            // 2.因为bucket（桶）的存在，当当前bucket下的node均循环完了(node=null)则需要将current_node切换到下一个bucket的头节点(node)
             if ((next = (current = e).next) == null && (t = table) != null) {
                 do {} while (index < t.length && (next = t[index++]) == null);
             }
@@ -1810,29 +1817,34 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 throw new ConcurrentModificationException();
             current = null;
             K key = p.key;
+            // 调用的是map的remove
             removeNode(hash(key), key, null, false, false);
+            // 这个是重点，为什么我说不允许外部删除
             expectedModCount = modCount;
         }
     }
 
-    final class KeyIterator extends HashIterator
-            implements Iterator<K> {
-        public final K next() { return nextNode().key; }
+    final class KeyIterator extends HashIterator implements Iterator<K> {
+        public final K next() {
+            return nextNode().key;
+        }
     }
 
-    final class ValueIterator extends HashIterator
-            implements Iterator<V> {
-        public final V next() { return nextNode().value; }
+    final class ValueIterator extends HashIterator implements Iterator<V> {
+        public final V next() {
+            return nextNode().value;
+        }
     }
 
-    final class EntryIterator extends HashIterator
-            implements Iterator<Entry<K,V>> {
-        public final Entry<K,V> next() { return nextNode(); }
+    final class EntryIterator extends HashIterator implements Iterator<Entry<K,V>> {
+        public final Entry<K,V> next() {
+            return nextNode();
+        }
     }
 
     /* ------------------------------------------------------------ */
     // spliterators
-
+    // 这个如同上面的迭代器实现，这里其实也可以看作是一个抽象类是对 KeySpliterator、ValueSpliterator、EntrySpliterator的抽象实现
     static class HashMapSpliterator<K,V> {
         final HashMap<K,V> map;
         Node<K,V> current;          // current node
@@ -1846,6 +1858,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                            int expectedModCount) {
             this.map = m;
             this.index = origin;
+            // 围栏
             this.fence = fence;
             this.est = est;
             this.expectedModCount = expectedModCount;
