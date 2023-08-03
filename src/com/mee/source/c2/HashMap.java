@@ -1846,16 +1846,15 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     // spliterators
     // 这个如同上面的迭代器实现，这里其实也可以看作是一个抽象类是对 KeySpliterator、ValueSpliterator、EntrySpliterator的抽象实现
     static class HashMapSpliterator<K,V> {
+        // 这个map是持有当前HashMap的一个引用而已
         final HashMap<K,V> map;
-        Node<K,V> current;          // current node
-        int index;                  // current index, modified on advance/split
-        int fence;                  // one past last index
-        int est;                    // size estimate
-        int expectedModCount;       // for comodification checks
+        Node<K,V> current;          // current node 当前节点
+        int index;                  // current index, modified on advance/split 当前索引，提前/拆分时修改
+        int fence;                  // one past last index  倒数第1个索引
+        int est;                    // size estimate 规模估计
+        int expectedModCount;       // for comodification checks 用于共聚检查
 
-        HashMapSpliterator(HashMap<K,V> m, int origin,
-                           int fence, int est,
-                           int expectedModCount) {
+        HashMapSpliterator(HashMap<K,V> m, int origin,int fence, int est,int expectedModCount) {
             this.map = m;
             this.index = origin;
             // 围栏
@@ -1864,7 +1863,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             this.expectedModCount = expectedModCount;
         }
 
-        final int getFence() { // initialize fence and size on first use
+        // 获取围栏
+        final int getFence() { // initialize fence and size on first use 首次使用时初始化围栏和大小
             int hi;
             if ((hi = fence) < 0) {
                 HashMap<K,V> m = map;
@@ -1876,17 +1876,16 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return hi;
         }
 
+        // 获取大小
         public final long estimateSize() {
             getFence(); // force init
             return (long) est;
         }
     }
 
-    static final class KeySpliterator<K,V>
-            extends HashMapSpliterator<K,V>
-            implements Spliterator<K> {
-        KeySpliterator(HashMap<K,V> m, int origin, int fence, int est,
-                       int expectedModCount) {
+    // key拆分器
+    static final class KeySpliterator<K,V> extends HashMapSpliterator<K,V> implements Spliterator<K> {
+        KeySpliterator(HashMap<K,V> m, int origin, int fence, int est,int expectedModCount) {
             super(m, origin, fence, est, expectedModCount);
         }
 
@@ -1898,49 +1897,58 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         }
 
         public void forEachRemaining(Consumer<? super K> action) {
+            // i是循环变量 hi表示桶的大小 mc是版本
             int i, hi, mc;
-            if (action == null)
+            // 动作不能为空
+            if (action == null){
                 throw new NullPointerException();
+            }
             HashMap<K,V> m = map;
             Node<K,V>[] tab = m.table;
             if ((hi = fence) < 0) {
                 mc = expectedModCount = m.modCount;
                 hi = fence = (tab == null) ? 0 : tab.length;
-            }
-            else
+            }else{
                 mc = expectedModCount;
-            if (tab != null && tab.length >= hi &&
-                    (i = index) >= 0 && (i < (index = hi) || current != null)) {
+            }
+            if (tab != null && tab.length >= hi && (i = index) >= 0 && (i < (index = hi) || current != null)) {
                 Node<K,V> p = current;
                 current = null;
                 do {
-                    if (p == null)
+                    if (p == null){
                         p = tab[i++];
-                    else {
+                    }else {
+                        // 这里应用每一个key
                         action.accept(p.key);
                         p = p.next;
                     }
                 } while (p != null || i < hi);
-                if (m.modCount != mc)
+                // 也是不允许迭代时修改
+                if (m.modCount != mc){
                     throw new ConcurrentModificationException();
+                }
             }
         }
 
+        // 尝试前进
         public boolean tryAdvance(Consumer<? super K> action) {
             int hi;
-            if (action == null)
+            if (action == null){
                 throw new NullPointerException();
+            }
             Node<K,V>[] tab = map.table;
             if (tab != null && tab.length >= (hi = getFence()) && index >= 0) {
+                // 如果当前map不是空，则while只循环两次，action只应用第一个key
                 while (current != null || index < hi) {
-                    if (current == null)
+                    if (current == null){
                         current = tab[index++];
-                    else {
+                    } else {
                         K k = current.key;
                         current = current.next;
                         action.accept(k);
-                        if (map.modCount != expectedModCount)
+                        if (map.modCount != expectedModCount){
                             throw new ConcurrentModificationException();
+                        }
                         return true;
                     }
                 }
@@ -1948,41 +1956,40 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return false;
         }
 
+        // 特征
         public int characteristics() {
-            return (fence < 0 || est == map.size ? Spliterator.SIZED : 0) |
-                    Spliterator.DISTINCT;
+            // 结果是65
+            return (fence < 0 || est == map.size ? Spliterator.SIZED : 0) | Spliterator.DISTINCT;
         }
     }
 
-    static final class ValueSpliterator<K,V>
-            extends HashMapSpliterator<K,V>
-            implements Spliterator<V> {
-        ValueSpliterator(HashMap<K,V> m, int origin, int fence, int est,
-                         int expectedModCount) {
+    static final class ValueSpliterator<K,V> extends HashMapSpliterator<K,V> implements Spliterator<V> {
+        ValueSpliterator(HashMap<K,V> m, int origin, int fence, int est, int expectedModCount) {
             super(m, origin, fence, est, expectedModCount);
         }
 
+        // 尝试返回一个value的spliter,如果当前map不是空都是有返回的
         public ValueSpliterator<K,V> trySplit() {
             int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
             return (lo >= mid || current != null) ? null :
-                    new ValueSpliterator<>(map, lo, index = mid, est >>>= 1,
-                            expectedModCount);
+                    new ValueSpliterator<>(map, lo, index = mid, est >>>= 1, expectedModCount);
         }
 
+        // 循环Set中每一个元素的value并应用与action
         public void forEachRemaining(Consumer<? super V> action) {
             int i, hi, mc;
-            if (action == null)
+            if (action == null){
                 throw new NullPointerException();
+            }
             HashMap<K,V> m = map;
             Node<K,V>[] tab = m.table;
             if ((hi = fence) < 0) {
                 mc = expectedModCount = m.modCount;
                 hi = fence = (tab == null) ? 0 : tab.length;
-            }
-            else
+            } else{
                 mc = expectedModCount;
-            if (tab != null && tab.length >= hi &&
-                    (i = index) >= 0 && (i < (index = hi) || current != null)) {
+            }
+            if (tab != null && tab.length >= hi && (i = index) >= 0 && (i < (index = hi) || current != null)) {
                 Node<K,V> p = current;
                 current = null;
                 do {
@@ -1998,10 +2005,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
         }
 
+        // 尝试迭代一个节点，如果为空或者action为null则返回false，action只应用头节点的value
         public boolean tryAdvance(Consumer<? super V> action) {
             int hi;
-            if (action == null)
+            if (action == null){
                 throw new NullPointerException();
+            }
             Node<K,V>[] tab = map.table;
             if (tab != null && tab.length >= (hi = getFence()) && index >= 0) {
                 while (current != null || index < hi) {
@@ -2020,24 +2029,22 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return false;
         }
 
+        // 这个应该是给父类使用 标识拆分大小默认64
         public int characteristics() {
             return (fence < 0 || est == map.size ? Spliterator.SIZED : 0);
         }
     }
 
-    static final class EntrySpliterator<K,V>
-            extends HashMapSpliterator<K,V>
-            implements Spliterator<Entry<K,V>> {
-        EntrySpliterator(HashMap<K,V> m, int origin, int fence, int est,
-                         int expectedModCount) {
+    // HashMap的entity的splitertor的实现
+    static final class EntrySpliterator<K,V> extends HashMapSpliterator<K,V> implements Spliterator<Entry<K,V>> {
+        EntrySpliterator(HashMap<K,V> m, int origin, int fence, int est, int expectedModCount) {
             super(m, origin, fence, est, expectedModCount);
         }
 
         public EntrySpliterator<K,V> trySplit() {
             int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
             return (lo >= mid || current != null) ? null :
-                    new EntrySpliterator<>(map, lo, index = mid, est >>>= 1,
-                            expectedModCount);
+                    new EntrySpliterator<>(map, lo, index = mid, est >>>= 1, expectedModCount);
         }
 
         public void forEachRemaining(Consumer<? super Entry<K,V>> action) {
@@ -2099,7 +2106,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /* ------------------------------------------------------------ */
     // LinkedHashMap support
-
+    // 因为LinkedHashMap有继承HashMap，所以如下方法会被LinkedHashMap中的覆盖
 
     /*
      * The following package-protected methods are designed to be
@@ -2107,24 +2114,28 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Nearly all other internal methods are also package-protected
      * but are declared final, so can be used by LinkedHashMap, view
      * classes, and HashSet.
+     *  以下包装保护方法旨在被LinkedHashMap覆盖，但不被任何其他子类覆盖。
+     *  几乎所有其他内部方法也受到包保护但是被声明为final，因此可以由LinkedHashMap、视图使用类和HashSet。
      */
 
     // Create a regular (non-tree) node
+    // 创建一个非树的节点（普通节点）
     Node<K,V> newNode(int hash, K key, V value, Node<K,V> next) {
         return new Node<>(hash, key, value, next);
     }
 
     // For conversion from TreeNodes to plain nodes
+    // 用于从树节点转换为普通节点
     Node<K,V> replacementNode(Node<K,V> p, Node<K,V> next) {
         return new Node<>(p.hash, p.key, p.value, next);
     }
 
-    // Create a tree bin node
+    // Create a tree bin node   创建树箱节点
     TreeNode<K,V> newTreeNode(int hash, K key, V value, Node<K,V> next) {
         return new TreeNode<>(hash, key, value, next);
     }
 
-    // For treeifyBin
+    // For treeifyBin 替换为树节点
     TreeNode<K,V> replacementTreeNode(Node<K,V> p, Node<K,V> next) {
         return new TreeNode<>(p.hash, p.key, p.value, next);
     }
@@ -2143,18 +2154,21 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         size = 0;
     }
 
-    // Callbacks to allow LinkedHashMap post-actions
+    // 以下三个方法均是空是实现，具体实现是在LinkedHashMap中
+    // Callbacks to allow LinkedHashMap post-actions 回调以允许LinkedHashMap发布操作
     void afterNodeAccess(Node<K,V> p) { }
     void afterNodeInsertion(boolean evict) { }
     void afterNodeRemoval(Node<K,V> p) { }
 
     // Called only from writeObject, to ensure compatible ordering.
     // 仅从writeObject调用，以确保排序兼容。
+    // 内部写入条目
     void internalWriteEntries(java.io.ObjectOutputStream s) throws IOException {
         Node<K,V>[] tab;
         if (size > 0 && (tab = table) != null) {
             for (int i = 0; i < tab.length; ++i) {
                 for (Node<K,V> e = tab[i]; e != null; e = e.next) {
+                    // 循环每个桶里面的每一个Node数组，获取其key&value并写入
                     s.writeObject(e.key);
                     s.writeObject(e.value);
                 }
@@ -2169,49 +2183,64 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Entry for Tree bins. Extends LinkedHashMap.Entry (which in turn
      * extends Node) so can be used as extension of either regular or
      * linked node.
+     *  Tree bin的条目。扩展LinkedHashMap.Entry（反过来extends Node），因此可以用作正则或链接节点
      */
     static final class TreeNode<K,V> extends LinkedHashMap.Entry<K,V> {
-        TreeNode<K,V> parent;  // red-black tree links
-        TreeNode<K,V> left;
-        TreeNode<K,V> right;
-        TreeNode<K,V> prev;    // needed to unlink next upon deletion
-        boolean red;
+        TreeNode<K,V> parent;  // red-black tree links  红黑树链接
+        TreeNode<K,V> left; // 左节点
+        TreeNode<K,V> right; // 右节点
+        TreeNode<K,V> prev;    // needed to unlink next upon deletion   删除后需要取消下一个链接
+        boolean red;    // 红黑树
         TreeNode(int hash, K key, V val, Node<K,V> next) {
             super(hash, key, val, next);
         }
 
         /**
          * Returns root of tree containing this node.
+         *  返回包含此节点的树的根
          */
         final TreeNode<K,V> root() {
+            // 一级级网上找(parent),直到parent=null则返回这个root节点
             for (TreeNode<K,V> r = this, p;;) {
-                if ((p = r.parent) == null)
+                if ((p = r.parent) == null){
                     return r;
+                }
                 r = p;
             }
         }
 
         /**
          * Ensures that the given root is the first node of its bin.
+         *  确保给定的根是其bin的第一个节点
          */
         static <K,V> void moveRootToFront(Node<K,V>[] tab, TreeNode<K,V> root) {
             int n;
             if (root != null && tab != null && (n = tab.length) > 0) {
+                // 计算root所在桶的位置
                 int index = (n - 1) & root.hash;
                 TreeNode<K,V> first = (TreeNode<K,V>)tab[index];
+                // 对象是否一致是可以直接比较
                 if (root != first) {
                     Node<K,V> rn;
+                    // 重新赋值 ？？？
                     tab[index] = root;
                     TreeNode<K,V> rp = root.prev;
-                    if ((rn = root.next) != null)
+                    // root的前驱节点与root的后继节点相互绑定
+                    if ((rn = root.next) != null){
                         ((TreeNode<K,V>)rn).prev = rp;
-                    if (rp != null)
+                    }
+                    if (rp != null){
                         rp.next = rn;
-                    if (first != null)
+                    }
+                    // 节点做双向绑定 old_root(first)与root(传入的)
+                    if (first != null){
                         first.prev = root;
+                    }
                     root.next = first;
+                    // 如果是桶的root节点自然它的前驱节点就是null
                     root.prev = null;
                 }
+                // 检查不变量 后面会说
                 assert checkInvariants(root);
             }
         }
@@ -2220,36 +2249,43 @@ public class HashMap<K,V> extends AbstractMap<K,V>
          * Finds the node starting at root p with the given hash and key.
          * The kc argument caches comparableClassFor(key) upon first use
          * comparing keys.
+         *  查找从根p开始并具有给定哈希和密钥的节点。
+         *  kc参数在首次使用时缓存comparableClassFor（键）比较键。
+         *  h: 节点key的hash
+         *  k: key本身
+         *  kc: 传入的key的类Class对象
+         *  当前方法是节点的查找方法,找不到返回null
          */
         final TreeNode<K,V> find(int h, Object k, Class<?> kc) {
             TreeNode<K,V> p = this;
             do {
                 int ph, dir; K pk;
                 TreeNode<K,V> pl = p.left, pr = p.right, q;
-                if ((ph = p.hash) > h)
+                if ((ph = p.hash) > h) // 小于当前节点hash的取节点左子节点
                     p = pl;
-                else if (ph < h)
+                else if (ph < h)    // 大于当前节点hash的取右子节点
                     p = pr;
-                else if ((pk = p.key) == k || (k != null && k.equals(pk)))
+                else if ((pk = p.key) == k || (k != null && k.equals(pk))) // 找到了直接返回这个节点
                     return p;
-                else if (pl == null)
+                else if (pl == null) // 左子节点为null的取右子节点
                     p = pr;
-                else if (pr == null)
+                else if (pr == null) // 右子节点为null的取左子节点
                     p = pl;
-                else if ((kc != null ||
-                        (kc = comparableClassFor(k)) != null) &&
-                        (dir = compareComparables(kc, k, pk)) != 0)
-                    p = (dir < 0) ? pl : pr;
-                else if ((q = pr.find(h, k, kc)) != null)
+                else if ( (kc != null || (kc = comparableClassFor(k)) != null) && // 先检查传入的key的（kc）类型是否为null
+                          (dir = compareComparables(kc, k, pk)) != 0 )  // 主要比较k与pk（按ascii位比较相等为0）
+                    p = (dir < 0) ? pl : pr; // dir小于零则k在p的左节点否则是右节点（寻找）
+                else if ((q = pr.find(h, k, kc)) != null) //直接从右子节点寻找，找到则返回节点
                     return q;
                 else
-                    p = pl;
+                    p = pl; // 置为左子节点
             } while (p != null);
             return null;
         }
 
         /**
          * Calls find for root node.
+         *  调用查找根节点
+         *  从根节点开始查找指定key所在的节点
          */
         final TreeNode<K,V> getTreeNode(int h, Object k) {
             return ((parent != null) ? root() : this).find(h, k, null);
@@ -2261,65 +2297,77 @@ public class HashMap<K,V> extends AbstractMap<K,V>
          * order, just a consistent insertion rule to maintain
          * equivalence across rebalancings. Tie-breaking further than
          * necessary simplifies testing a bit.
+         * 当hashCodes相等且不可比较时，用于排序插入的平局打破实用程序。
+         * 我们不需要总顺序，只需要一个一致的插入规则来保持重新平衡的等价性。进一步打破平局比必要的简化了一点测试。
+         * 平局决胜令??? 具体用处后面会说e
          */
         static int tieBreakOrder(Object a, Object b) {
             int d;
-            if (a == null || b == null ||
-                    (d = a.getClass().getName().
-                            compareTo(b.getClass().getName())) == 0)
-                d = (System.identityHashCode(a) <= System.identityHashCode(b) ?
-                        -1 : 1);
+            // a或b为null的或类型一致的 计算hashcode并比较大小，最终返回的只可能是-1或1
+            if (a == null || b == null || (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0){
+                d = (System.identityHashCode(a) <= System.identityHashCode(b) ? -1 : 1);
+            }
             return d;
         }
 
         /**
          * Forms tree of the nodes linked from this node.
+         *  形成从该节点链接的节点的树
+         *  使树化
          */
         final void treeify(Node<K,V>[] tab) {
             TreeNode<K,V> root = null;
+            // x始终是当前节点 next则是x的后继节点
             for (TreeNode<K,V> x = this, next; x != null; x = next) {
                 next = (TreeNode<K,V>)x.next;
+                // 重置x的左右子节点为null
                 x.left = x.right = null;
                 if (root == null) {
                     x.parent = null;
                     x.red = false;
                     root = x;
-                }
-                else {
+                } else {
                     K k = x.key;
                     int h = x.hash;
                     Class<?> kc = null;
+                    // 从根节点开始~
                     for (TreeNode<K,V> p = root;;) {
                         int dir, ph;
                         K pk = p.key;
+                        // 这几行判断主要计算dir值
+                        // dir是后续节点位置的依据
                         if ((ph = p.hash) > h)
                             dir = -1;
                         else if (ph < h)
                             dir = 1;
-                        else if ((kc == null &&
-                                (kc = comparableClassFor(k)) == null) ||
-                                (dir = compareComparables(kc, k, pk)) == 0)
+                        else if ( (kc == null && (kc = comparableClassFor(k)) == null) ||
+                                  (dir = compareComparables(kc, k, pk)) == 0)
                             dir = tieBreakOrder(k, pk);
 
-                        TreeNode<K,V> xp = p;
-                        if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                        TreeNode<K,V> xp = p; // p就是root？？？
+                        if ( (p = (dir <= 0) ? p.left : p.right) == null ) {
                             x.parent = xp;
-                            if (dir <= 0)
+                            if (dir <= 0){
                                 xp.left = x;
-                            else
+                            } else {
                                 xp.right = x;
+                            }
+                            // 平衡插入
                             root = balanceInsertion(root, x);
                             break;
                         }
                     }
                 }
             }
+            // 调整根节点位置
             moveRootToFront(tab, root);
         }
 
         /**
          * Returns a list of non-TreeNodes replacing those linked from
          * this node.
+         *   返回替换从此节点链接的非树节点的列表。
+         *   是不是将树退化为链表结构??? todo
          */
         final Node<K,V> untreeify(HashMap<K,V> map) {
             Node<K,V> hd = null, tl = null;
@@ -2331,37 +2379,41 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     tl.next = p;
                 tl = p;
             }
+            // 返回的是第一个节点
             return hd;
         }
 
         /**
          * Tree version of putVal.
+         *  putVal的树版本。
+         *  向树添加一个节点
          */
-        final TreeNode<K,V> putTreeVal(HashMap<K,V> map, Node<K,V>[] tab,
-                                       int h, K k, V v) {
+        final TreeNode<K,V> putTreeVal(HashMap<K,V> map, Node<K,V>[] tab, int h, K k, V v) {
             Class<?> kc = null;
             boolean searched = false;
+            // 获取树的根节点
             TreeNode<K,V> root = (parent != null) ? root() : this;
             for (TreeNode<K,V> p = root;;) {
                 int dir, ph; K pk;
+                // 这一片是计算节点的权重（dir）
                 if ((ph = p.hash) > h)
                     dir = -1;
                 else if (ph < h)
                     dir = 1;
                 else if ((pk = p.key) == k || (k != null && k.equals(pk)))
-                    return p;
-                else if ((kc == null &&
-                        (kc = comparableClassFor(k)) == null) ||
+                    return p; // 这个是返回原节点
+                else if ((kc == null && (kc = comparableClassFor(k)) == null) ||
                         (dir = compareComparables(kc, k, pk)) == 0) {
                     if (!searched) {
                         TreeNode<K,V> q, ch;
                         searched = true;
-                        if (((ch = p.left) != null &&
-                                (q = ch.find(h, k, kc)) != null) ||
-                                ((ch = p.right) != null &&
-                                        (q = ch.find(h, k, kc)) != null))
+                        // 从左节点搜索q并直接返回
+                        if (((ch = p.left) != null && (q = ch.find(h, k, kc)) != null) ||
+                                ((ch = p.right) != null && (q = ch.find(h, k, kc)) != null)){
                             return q;
+                        }
                     }
+                    // 从当前节点的key以及传入的key计算dir（路径权重）
                     dir = tieBreakOrder(k, pk);
                 }
 
@@ -2369,15 +2421,19 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 if ((p = (dir <= 0) ? p.left : p.right) == null) {
                     Node<K,V> xpn = xp.next;
                     TreeNode<K,V> x = map.newTreeNode(h, k, v, xpn);
+                    // 新节点的插入位置(by dir)
                     if (dir <= 0)
                         xp.left = x;
                     else
                         xp.right = x;
-                    xp.next = x;
-                    x.parent = x.prev = xp;
-                    if (xpn != null)
+                    xp.next = x; // 插入到p节点之后
+                    x.parent = x.prev = xp; // 新增节点的父节点也即它的前驱节点同时也是当前节点p(xp=p)
+                    if (xpn != null){
                         ((TreeNode<K,V>)xpn).prev = x;
+                    }
+                    // 调整根节点同时平衡插入节点
                     moveRootToFront(tab, balanceInsertion(root, x));
+                    // 新增插入返回的是null(没有重复节点时)
                     return null;
                 }
             }
@@ -2392,12 +2448,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
          * linkages. If the current tree appears to have too few nodes,
          * the bin is converted back to a plain bin. (The test triggers
          * somewhere between 2 and 6 nodes, depending on tree structure).
+         *  删除给定的节点，该节点必须在此调用之前存在。这比典型的红黑删除代码更混乱，因为我们不能将内部节点的内容与叶后继节点交换，
+         *  后者由遍历期间可独立访问的“下一个”指针固定。因此，我们交换了树链接。如果当前树的节点太少，则bin将转换回普通bin。
+         *  （根据树结构，测试会在2到6个节点之间触发）。
          */
-        final void removeTreeNode(HashMap<K,V> map, Node<K,V>[] tab,
-                                  boolean movable) {
+        final void removeTreeNode(HashMap<K,V> map, Node<K,V>[] tab, boolean movable) {
+            // 这个n即是桶的大小
             int n;
-            if (tab == null || (n = tab.length) == 0)
+            if (tab == null || (n = tab.length) == 0){
                 return;
+            }
+            // index是用于计算key所在桶的位置
             int index = (n - 1) & hash;
             TreeNode<K,V> first = (TreeNode<K,V>)tab[index], root = first, rl;
             TreeNode<K,V> succ = (TreeNode<K,V>)next, pred = prev;
@@ -2411,37 +2472,40 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 return;
             if (root.parent != null)
                 root = root.root();
-            if (root == null
-                    || (movable
-                    && (root.right == null
-                    || (rl = root.left) == null
-                    || rl.left == null))) {
+            if (root == null || (
+                    movable && (root.right == null || (rl = root.left) == null || rl.left == null) )) {
+                // first为当前桶的首位置 ，这里应该是做的树退化为链表的操作.
                 tab[index] = first.untreeify(map);  // too small
                 return;
             }
             TreeNode<K,V> p = this, pl = left, pr = right, replacement;
             if (pl != null && pr != null) {
                 TreeNode<K,V> s = pr, sl;
+                // 左节点不为空s就是它
                 while ((sl = s.left) != null) // find successor
                     s = sl;
-                boolean c = s.red; s.red = p.red; p.red = c; // swap colors
+                // s的颜色变为p的颜色 p则变为c的颜色
+                boolean c = s.red; s.red = p.red; p.red = c; // swap colors 交换颜色
                 TreeNode<K,V> sr = s.right;
                 TreeNode<K,V> pp = p.parent;
-                if (s == pr) { // p was s's direct parent
+                if (s == pr) { // p was s's direct parent   p是s的直接父母
+                    // 调整节点位置
                     p.parent = s;
                     s.right = p;
-                }
-                else {
+                } else {
                     TreeNode<K,V> sp = s.parent;
                     if ((p.parent = sp) != null) {
+                        // 调整p为sp的子节点
                         if (s == sp.left)
                             sp.left = p;
                         else
                             sp.right = p;
                     }
+                    // s为根节点
                     if ((s.right = pr) != null)
                         pr.parent = s;
                 }
+                // 复杂的调整 todo...
                 p.left = null;
                 if ((p.right = sr) != null)
                     sr.parent = p;
@@ -2465,6 +2529,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             else
                 replacement = p;
             if (replacement != p) {
+                // 不是当前节点p的就要向左或者右子节点调整
                 TreeNode<K,V> pp = replacement.parent = p.parent;
                 if (pp == null)
                     root = replacement;
@@ -2472,14 +2537,15 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     pp.left = replacement;
                 else
                     pp.right = replacement;
+                // 当前节点去掉连接关系
                 p.left = p.right = p.parent = null;
             }
 
             TreeNode<K,V> r = p.red ? root : balanceDeletion(root, replacement);
-
-            if (replacement == p) {  // detach
+            if (replacement == p) {  // detach 移除
                 TreeNode<K,V> pp = p.parent;
                 p.parent = null;
+                // 移除p与pp的关系
                 if (pp != null) {
                     if (p == pp.left)
                         pp.left = null;
@@ -2487,60 +2553,69 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                         pp.right = null;
                 }
             }
-            if (movable)
+            if (movable){
                 moveRootToFront(tab, r);
+            }
         }
 
         /**
          * Splits nodes in a tree bin into lower and upper tree bins,
          * or untreeifies if now too small. Called only from resize;
          * see above discussion about split bits and indices.
+         *  将树容器中的节点拆分为较低的树容器和较高的树容器，如果现在太小，则取消测试。仅从resize调用；请参阅上面关于拆分位和索引的讨论。
          *
-         * @param map the map
-         * @param tab the table for recording bin heads
-         * @param index the index of the table being split
-         * @param bit the bit of hash to split on
+         * @param map the map HashMap对象
+         * @param tab the table for recording bin heads 记录仓头的表格
+         * @param index the index of the table being split  要拆分的表的索引
+         * @param bit the bit of hash to split on   要拆分的哈希位
          */
         final void split(HashMap<K,V> map, Node<K,V>[] tab, int index, int bit) {
             TreeNode<K,V> b = this;
-            // Relink into lo and hi lists, preserving order
+            // Relink into lo and hi lists, preserving order    重新链接到lo和hi列表，保持顺序
             TreeNode<K,V> loHead = null, loTail = null;
             TreeNode<K,V> hiHead = null, hiTail = null;
             int lc = 0, hc = 0;
-            for (TreeNode<K,V> e = b, next; e != null; e = next) {
+            // 默认e和b都是this（TreeNode<K,V>）
+            for ( TreeNode<K,V> e = b, next; e != null; e = next ) {
                 next = (TreeNode<K,V>)e.next;
-                e.next = null;
+                e.next = null; // 解除关联
                 if ((e.hash & bit) == 0) {
-                    if ((e.prev = loTail) == null)
+                    // 设置低位
+                    if ((e.prev = loTail) == null){
                         loHead = e;
-                    else
+                    } else{
                         loTail.next = e;
+                    }
                     loTail = e;
+                    // 记录层数
                     ++lc;
-                }
-                else {
-                    if ((e.prev = hiTail) == null)
+                } else {
+                    // 设置高位
+                    if ((e.prev = hiTail) == null){
                         hiHead = e;
-                    else
+                    }else{
                         hiTail.next = e;
+                    }
                     hiTail = e;
                     ++hc;
                 }
             }
 
             if (loHead != null) {
+                // UNTREEIFY_THRESHOLD 未试验阈值
                 if (lc <= UNTREEIFY_THRESHOLD)
                     tab[index] = loHead.untreeify(map);
                 else {
                     tab[index] = loHead;
-                    if (hiHead != null) // (else is already treeified)
+                    if (hiHead != null) // (else is already treeified)  其他已被树化
                         loHead.treeify(tab);
                 }
             }
             if (hiHead != null) {
-                if (hc <= UNTREEIFY_THRESHOLD)
+                // 索引位置+拆分位
+                if (hc <= UNTREEIFY_THRESHOLD){
                     tab[index + bit] = hiHead.untreeify(map);
-                else {
+                } else {
                     tab[index + bit] = hiHead;
                     if (loHead != null)
                         hiHead.treeify(tab);
@@ -2550,15 +2625,18 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
         /* ------------------------------------------------------------ */
         // Red-black tree methods, all adapted from CLR
+        // 红黑树方法，全部改编自CLR
 
-        static <K,V> TreeNode<K,V> rotateLeft(TreeNode<K,V> root,
-                                              TreeNode<K,V> p) {
+        // 红黑树左旋
+        static <K,V> TreeNode<K,V> rotateLeft( TreeNode<K,V> root,TreeNode<K,V> p ) {
             TreeNode<K,V> r, pp, rl;
+            // 只在右节点不为null时才需调整
             if (p != null && (r = p.right) != null) {
                 if ((rl = p.right = r.left) != null)
                     rl.parent = p;
+                // 红黑树左旋并不代表右侧节点不动
                 if ((pp = r.parent = p.parent) == null)
-                    (root = r).red = false;
+                    (root = r).red = false; // 父节点/根节点为黑
                 else if (pp.left == p)
                     pp.left = r;
                 else
@@ -2569,14 +2647,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return root;
         }
 
-        static <K,V> TreeNode<K,V> rotateRight(TreeNode<K,V> root,
-                                               TreeNode<K,V> p) {
+        // 红黑树右旋
+        static <K,V> TreeNode<K,V> rotateRight(TreeNode<K,V> root, TreeNode<K,V> p) {
             TreeNode<K,V> l, pp, lr;
             if (p != null && (l = p.left) != null) {
                 if ((lr = p.left = l.right) != null)
                     lr.parent = p;
                 if ((pp = l.parent = p.parent) == null)
-                    (root = l).red = false;
+                    (root = l).red = false; // ??? todo...
                 else if (pp.right == p)
                     pp.right = l;
                 else
@@ -2587,24 +2665,25 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return root;
         }
 
-        static <K,V> TreeNode<K,V> balanceInsertion(TreeNode<K,V> root,
-                                                    TreeNode<K,V> x) {
+        // 平衡插入
+        static <K,V> TreeNode<K,V> balanceInsertion(TreeNode<K,V> root, TreeNode<K,V> x) {
             x.red = true;
             for (TreeNode<K,V> xp, xpp, xppl, xppr;;) {
                 if ((xp = x.parent) == null) {
-                    x.red = false;
+                    x.red = false; // 根节点必须是黑
                     return x;
-                }
-                else if (!xp.red || (xpp = xp.parent) == null)
+                } else if (!xp.red || (xpp = xp.parent) == null){ // xp.parent = x.parent
                     return root;
+                }
                 if (xp == (xppl = xpp.left)) {
-                    if ((xppr = xpp.right) != null && xppr.red) {
+                    // 右节点不为null的且当前xppr为红的需要重新染色
+                    if ( (xppr = xpp.right) != null && xppr.red ) {
                         xppr.red = false;
                         xp.red = false;
                         xpp.red = true;
                         x = xpp;
-                    }
-                    else {
+                    } else {
+                        // 向右插入时左旋
                         if (x == xp.right) {
                             root = rotateLeft(root, x = xp);
                             xpp = (xp = x.parent) == null ? null : xp.parent;
@@ -2617,15 +2696,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                             }
                         }
                     }
-                }
-                else {
+                } else {
                     if (xppl != null && xppl.red) {
                         xppl.red = false;
                         xp.red = false;
                         xpp.red = true;
                         x = xpp;
-                    }
-                    else {
+                    } else {
+                        // 左边插入的右旋
                         if (x == xp.left) {
                             root = rotateRight(root, x = xp);
                             xpp = (xp = x.parent) == null ? null : xp.parent;
@@ -2642,81 +2720,83 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
         }
 
-        static <K,V> TreeNode<K,V> balanceDeletion(TreeNode<K,V> root,
-                                                   TreeNode<K,V> x) {
+        // 删除后平衡树
+        static <K,V> TreeNode<K,V> balanceDeletion(TreeNode<K,V> root, TreeNode<K,V> x) {
             for (TreeNode<K,V> xp, xpl, xpr;;) {
-                if (x == null || x == root)
+                if (x == null || x == root){
                     return root;
-                else if ((xp = x.parent) == null) {
-                    x.red = false;
+                } else if ((xp = x.parent) == null) {
+                    x.red = false;// root node ?
                     return x;
-                }
-                else if (x.red) {
+                } else if (x.red) {
+                    // 仅切换颜色
                     x.red = false;
                     return root;
-                }
-                else if ((xpl = xp.left) == x) {
+                } else if ((xpl = xp.left) == x) {
                     if ((xpr = xp.right) != null && xpr.red) {
+                        // 右节点为红节点时 调整节点为黑节点 同时左旋
                         xpr.red = false;
                         xp.red = true;
                         root = rotateLeft(root, xp);
                         xpr = (xp = x.parent) == null ? null : xp.right;
                     }
-                    if (xpr == null)
+                    if (xpr == null){
                         x = xp;
-                    else {
+                    } else {
+                        // 右节点不为null时
                         TreeNode<K,V> sl = xpr.left, sr = xpr.right;
-                        if ((sr == null || !sr.red) &&
-                                (sl == null || !sl.red)) {
-                            xpr.red = true;
+                        if ((sr == null || !sr.red) && (sl == null || !sl.red)) {
+                            xpr.red = true; // 调整颜色
                             x = xp;
-                        }
-                        else {
+                        } else {
                             if (sr == null || !sr.red) {
-                                if (sl != null)
+                                // 右节点为空或节点为黑时 右旋
+                                if (sl != null){
                                     sl.red = false;
+                                }
                                 xpr.red = true;
                                 root = rotateRight(root, xpr);
-                                xpr = (xp = x.parent) == null ?
-                                        null : xp.right;
+                                xpr = (xp = x.parent) == null ? null : xp.right;
                             }
                             if (xpr != null) {
+                                // 仅着色
                                 xpr.red = (xp == null) ? false : xp.red;
-                                if ((sr = xpr.right) != null)
+                                if ((sr = xpr.right) != null){
                                     sr.red = false;
+                                }
                             }
                             if (xp != null) {
+                                // 当前节点着色并左移
                                 xp.red = false;
                                 root = rotateLeft(root, xp);
                             }
                             x = root;
                         }
                     }
-                }
-                else { // symmetric
+                } else { // symmetric   对称的
                     if (xpl != null && xpl.red) {
                         xpl.red = false;
                         xp.red = true;
-                        root = rotateRight(root, xp);
+                        root = rotateRight(root, xp); // 右旋
+                        // 重新赋值
                         xpl = (xp = x.parent) == null ? null : xp.left;
                     }
-                    if (xpl == null)
+                    if (xpl == null){
                         x = xp;
-                    else {
+                    } else {
                         TreeNode<K,V> sl = xpl.left, sr = xpl.right;
-                        if ((sl == null || !sl.red) &&
-                                (sr == null || !sr.red)) {
+                        if ((sl == null || !sl.red) && (sr == null || !sr.red)) {
                             xpl.red = true;
                             x = xp;
                         }
                         else {
                             if (sl == null || !sl.red) {
-                                if (sr != null)
+                                if (sr != null){
                                     sr.red = false;
+                                }
                                 xpl.red = true;
-                                root = rotateLeft(root, xpl);
-                                xpl = (xp = x.parent) == null ?
-                                        null : xp.left;
+                                root = rotateLeft(root, xpl);// 左旋
+                                xpl = (xp = x.parent) == null ? null : xp.left;
                             }
                             if (xpl != null) {
                                 xpl.red = (xp == null) ? false : xp.red;
@@ -2725,7 +2805,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                             }
                             if (xp != null) {
                                 xp.red = false;
-                                root = rotateRight(root, xp);
+                                root = rotateRight(root, xp);// 右旋
                             }
                             x = root;
                         }
@@ -2736,9 +2816,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
         /**
          * Recursive invariant check
+         *  递归不变检查
+         *  检查不变量
          */
         static <K,V> boolean checkInvariants(TreeNode<K,V> t) {
-            TreeNode<K,V> tp = t.parent, tl = t.left, tr = t.right,
+            TreeNode<K,V> tp = t.parent,
+                    tl = t.left, tr = t.right,
                     tb = t.prev, tn = (TreeNode<K,V>)t.next;
             if (tb != null && tb.next != t)
                 return false;
@@ -2746,7 +2829,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 return false;
             if (tp != null && t != tp.left && t != tp.right)
                 return false;
-            if (tl != null && (tl.parent != t || tl.hash > t.hash))
+            if (tl != null && (tl.parent != t || tl.hash > t.hash)) // hash用于确定寻找路径
                 return false;
             if (tr != null && (tr.parent != t || tr.hash < t.hash))
                 return false;
